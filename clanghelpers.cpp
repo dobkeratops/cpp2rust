@@ -54,7 +54,7 @@ void clang_getCursorName(CXCursor cu, char* dst, int maxLen)
 	copyName(name, dst,maxLen);
 	clang_disposeString(name);
 }
-
+char g_hack[16];
 const char* CXCursorKind_to_str(CXCursorKind k) {
 #define IMPL(k) case CXCursor_ ## k : return # k; 
 	switch(k) {
@@ -73,6 +73,9 @@ const char* CXCursorKind_to_str(CXCursorKind k) {
 		IMPL(Constructor)
 		IMPL(Destructor)
 		IMPL(TemplateTypeParameter)
+		IMPL(TemplateTemplateParameter)
+		IMPL(NonTypeTemplateParameter)
+
 		IMPL(ClassTemplate)
 		IMPL(UsingDirective)
 //		IMPL(CallExpr)
@@ -88,7 +91,7 @@ const char* CXCursorKind_to_str(CXCursorKind k) {
 		IMPL(FirstStmt)
 		IMPL(DeclStmt)
 
-	default: return "?";
+	default: sprintf(g_hack,"%d",k);return g_hack;
 	}
 #undef IMPL
 }

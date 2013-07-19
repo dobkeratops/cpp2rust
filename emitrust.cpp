@@ -33,7 +33,20 @@ string emitRust_Typename(const AstNode* n) {
 		return emitRust_TypenameSub(firstSubNode);
 	break;
 	default:
-		return string(CXType_to_str(n->cxType));
+		// todo: seperate this case out
+		// template instance
+		if(firstSubNode->nodeKind==CXCursor_TemplateRef) {
+			//printf("emiting template type ref %s s=%d %s %s\n",firstSubNode->name.c_str(),n->subNodes.size(),n->subNodes[0].name.c_str(),n->subNodes[1].name.c_str());
+			string ret=string(firstSubNode->name)+"<";
+			for (size_t i=1; i<n->subNodes.size(); i++) {
+				ret+=emitRust_TypenameSub(&n->subNodes[i]);
+				if (i!=n->subNodes.size()-1) ret+=",";
+			}
+			ret+=">";
+			return ret;
+		}
+		else
+			return string(CXType_to_str(n->cxType));
 	}
 }
 
@@ -114,6 +127,7 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 	if  (methods.size()) {
 		EMIT("impl %s {\n", n.name.c_str());
 		for (auto &m:methods) {
+			EMIT("\t");
 			emitRust_FunctionDecl(*m,depth+1, n.name.c_str());
 		}
 		EMIT("}\n");
