@@ -170,10 +170,10 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 		EMIT("impl ");
 		emitRust_GenericTypeParams(typeParams);
 
-		EMIT("%s");
+		EMIT("%s",n.name.c_str());
 		emitRust_GenericTypeParams(typeParams);
 
-		EMIT(" {\n", n.name.c_str());
+		EMIT(" {\n", );
 //		auto f=n.findFirst(CXCursor_Constructor);
 		auto f=emitRust_FindDefaultConstructor(n);
 		if (f) 
