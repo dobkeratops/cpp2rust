@@ -75,6 +75,9 @@ const char* CXCursorKind_to_str(CXCursorKind k) {
 		IMPL(TemplateTypeParameter)
 		IMPL(TemplateTemplateParameter)
 		IMPL(NonTypeTemplateParameter)
+		IMPL(CXXTypeidExpr)
+
+
 
 		IMPL(ClassTemplate)
 		IMPL(UsingDirective)
@@ -88,6 +91,9 @@ const char* CXCursorKind_to_str(CXCursorKind k) {
 		IMPL(NamespaceRef)
 
 		IMPL(CallExpr)
+
+		IMPL(LabelStmt)
+		IMPL(CompoundStmt)
 		IMPL(FirstStmt)
 		IMPL(DeclStmt)
 

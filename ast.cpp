@@ -25,6 +25,19 @@ struct AstNode {
 			if (s.nodeKind==k)
 				results.push_back(&s);
 	}
+	int count( CXCursorKind k) const{
+		int num=0;
+		for (auto& s:subNodes)
+			if (s.nodeKind==k)
+				num++;
+		return num;
+	}
+	const AstNode* findFirst(CXCursorKind k) const {
+		for (auto& s:subNodes)
+			if (s.nodeKind==k)
+				return &s;
+		return nullptr;
+	}
 };
 typedef const AstNode* CpAstNode;
 

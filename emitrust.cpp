@@ -69,13 +69,9 @@ void emitRust_GenericTypeParams(vector<CpAstNode>& typeParams) {
 	}
 }
 
-
-void emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType) 	{
-	EMIT("pub fn %s",n.name.c_str());
+void emitRust_FunctionArguments(const AstNode&n, int depth,const char* selfType)
+{
 	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
-	vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
-
-	emitRust_GenericTypeParams(typeParams);
 	EMIT("(");
 	if (selfType) {
 		EMIT("self"); if (args.size()) EMIT(",");
@@ -88,10 +84,46 @@ void emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType) 	{
 		[](CpAstNode& s){EMIT(",");}
 	);
 	EMIT(")");
+}
+
+void emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType) 	{
+	EMIT("pub fn %s",n.name.c_str());
+	vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
+
+	emitRust_GenericTypeParams(typeParams);
+	emitRust_FunctionArguments(n,depth,selfType);
 	// todo: return type;
 	EMIT(";\n");
 }
 
+void emitRust_Constructor(const AstNode& n, int depth, const char* selfType) {
+	/*
+		// todo - wrappers for constructors with overload underscore qualifiers
+	*/
+	EMIT("\tpub fn new",n.name.c_str());
+	emitRust_FunctionArguments(n, depth, nullptr);
+	EMIT("->");
+	EMIT(selfType);
+	EMIT(";\n");
+}
+
+const AstNode* emitRust_FindDefaultConstructor(const AstNode& n) {
+	for (auto &sn:n.subNodes) {
+		if (sn.nodeKind==CXCursor_Constructor)
+			if (sn.count(CXCursor_ParmDecl))
+				return &sn;
+	}
+	return n.findFirst(CXCursor_Constructor);
+}
+
+void emitRust_Destructor(const AstNode& n, int depth, const char* selfType) {
+	/*
+		// todo - wrappers for constructors with overload underscore qualifiers
+	*/
+	EMIT("\tpub fn drop",n.name.c_str());
+	emitRust_FunctionArguments(n, depth, selfType);
+	EMIT(";\n");
+}
 
 void
 emitRust_ClassTemplate(const AstNode& n, int depth) 
@@ -106,6 +138,12 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 	vector<CpAstNode> methods;
 	n.filter(CXCursor_CXXMethod, methods);
 
+	auto f=n.findFirst(CXCursor_Constructor);
+	if (f)  {
+		EMIT("impl Drop for %s {\n", n.name.c_str());
+		emitRust_Destructor(*f,depth+1, n.name.c_str());
+		EMIT("}\n");
+	}
 	// todo - filter what this is really.
 	// only make it a rust struct if it has data elements?
 	// ..otherwise if its a collection of functions/types it's really trait?
@@ -129,7 +167,17 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 		EMIT("\n}\n");
 	}
 	if  (methods.size()) {
-		EMIT("impl %s {\n", n.name.c_str());
+		EMIT("impl ");
+		emitRust_GenericTypeParams(typeParams);
+
+		EMIT("%s");
+		emitRust_GenericTypeParams(typeParams);
+
+		EMIT(" {\n", n.name.c_str());
+//		auto f=n.findFirst(CXCursor_Constructor);
+		auto f=emitRust_FindDefaultConstructor(n);
+		if (f) 
+			emitRust_Constructor(*f,depth+1, n.name.c_str());
 		for (auto &m:methods) {
 			EMIT("\t");
 			emitRust_FunctionDecl(*m,depth+1, n.name.c_str());

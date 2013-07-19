@@ -58,8 +58,20 @@ CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData d
 
 	auto newNode = append(parentNode->subNodes,clang_getCursorKind(cu), elemName);
 	newNode->cxType = clang_getCursorType(cu);
-
+	if ((!strcmp(elemName,"std") || (elemName[0]=='_' && elemName[1]=='_'))&& clang_getCursorKind(cu)==CXCursor_Namespace) 
+	{	
+		// omit std namespace!
+		return CXChildVisit_Continue;
+	}
 	switch (clang_getCursorKind(cu)) {
+	// dont handle these in out AST mirror
+	case CXCursor_StmtExpr:
+	case CXCursor_CompoundStmt:
+	case CXCursor_FirstStmt:
+	case CXCursor_VarDecl:
+	default:
+		break;
+	// definitely handle these
 	case CXCursor_StructDecl:
 	case CXCursor_ClassDecl:
 	case CXCursor_UnionDecl:
@@ -72,6 +84,7 @@ CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData d
 	case CXCursor_Constructor:
 	case CXCursor_Destructor:
 	case CXCursor_TemplateTypeParameter:
+	case CXCursor_TemplateRef:
 	case CXCursor_ClassTemplate:
 	case CXCursor_UsingDirective:
 	case CXCursor_UsingDeclaration:
@@ -80,10 +93,9 @@ CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData d
 	case CXCursor_FunctionTemplate:
 	case CXCursor_EnumDecl:
 	case CXCursor_TypeAliasDecl:
-
+	// todo - extract return type? how? it doesn't seem to be there
 		clang_visitChildren(cu, buildMyAstNodes, (CXClientData*) newNode);
 	break;
-	default:
 		break;
 	}
 //	printf("num args=%d\n", clang_getCursorNumArgs(cu));
