@@ -8,6 +8,7 @@ void apply_separated( C& items, const F& main_item_function, const S& separating
 	}
 }
 string emitRust_Typename(const AstNode* n);
+/*
 string emitRust_TypenameSub(const AstNode* n) {
 	switch (n->nodeKind) {
 		case CXCursor_TypeRef:
@@ -16,21 +17,24 @@ string emitRust_TypenameSub(const AstNode* n) {
 	}
 	return emitRust_Typename(n);
 }
-
+*/
 string emitRust_Typename(const AstNode* n) {
 	static AstNode unknown(CXCursor_UnexposedDecl,"UNKNOWN","void",CXType{CXType_Void});
 	const AstNode* firstSubNode=n->subNodes.size()?&n->subNodes[0]:&unknown;
 	//todo: template
+	if (n->nodeKind==CXCursor_TypeRef)
+		return string(n->name);
+
 	switch (n->cxType.kind) {
 	case CXType_Record:
 	case CXType_Pointer:
-		return string("*")+emitRust_TypenameSub(firstSubNode);
+		return string("*")+emitRust_Typename(firstSubNode);
 
 	case CXType_LValueReference:
-		return string("&")+emitRust_TypenameSub(firstSubNode);
+		return string("&")+emitRust_Typename(firstSubNode);
 	break;
 	case CXType_Typedef:
-		return emitRust_TypenameSub(firstSubNode);
+		return emitRust_Typename(firstSubNode);
 	break;
 	default:
 		// todo: seperate this case out
@@ -39,7 +43,7 @@ string emitRust_Typename(const AstNode* n) {
 			//printf("emiting template type ref %s s=%d %s %s\n",firstSubNode->name.c_str(),n->subNodes.size(),n->subNodes[0].name.c_str(),n->subNodes[1].name.c_str());
 			string ret=string(firstSubNode->name)+"<";
 			for (size_t i=1; i<n->subNodes.size(); i++) {
-				ret+=emitRust_TypenameSub(&n->subNodes[i]);
+				ret+=emitRust_Typename(&n->subNodes[i]);
 				if (i!=n->subNodes.size()-1) ret+=",";
 			}
 			ret+=">";
