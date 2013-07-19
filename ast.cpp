@@ -32,12 +32,19 @@ struct AstNode {
 				num++;
 		return num;
 	}
-	const AstNode* findFirst(CXCursorKind k) const {
-		for (auto& s:subNodes)
+	const AstNode* findFirst(CXCursorKind k,bool recurse=false) const {
+		for (auto& s:subNodes) {
 			if (s.nodeKind==k)
 				return &s;
+			if (recurse){
+				auto sf=s.findFirst(k,recurse);
+				if (sf)
+					return sf;
+			}
+		}
 		return nullptr;
 	}
+	const AstNode* findFirstRec(CXCursorKind k) const { return findFirst(k,true);}
 };
 typedef const AstNode* CpAstNode;
 

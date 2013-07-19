@@ -68,7 +68,6 @@ CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData d
 	case CXCursor_StmtExpr:
 	case CXCursor_CompoundStmt:
 	case CXCursor_FirstStmt:
-	case CXCursor_VarDecl:
 	default:
 		break;
 	// definitely handle these
@@ -92,7 +91,18 @@ CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData d
 	case CXCursor_CallExpr:
 	case CXCursor_FunctionTemplate:
 	case CXCursor_EnumDecl:
+	case CXCursor_EnumConstantDecl:
 	case CXCursor_TypeAliasDecl:
+	case CXCursor_CXXBaseSpecifier:
+	case CXCursor_VarDecl:
+//	case CXCursor_VarDecl:
+	case CXCursor_FirstExpr:
+	case CXCursor_IntegerLiteral:
+	case CXCursor_StringLiteral:
+	case CXCursor_FloatingLiteral:
+	case CXCursor_CharacterLiteral:
+
+	case CXCursor_DeclRefExpr:
 	// todo - extract return type? how? it doesn't seem to be there
 		clang_visitChildren(cu, buildMyAstNodes, (CXClientData*) newNode);
 	break;
@@ -106,7 +116,20 @@ CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData d
 void testVisit(CXTranslationUnit tu) {
 	
 }
-struct Options{
+
+struct SomeBase {
+	int count;
+};
+
+struct Options : SomeBase{
+	struct Option_s {
+		int x,y;
+	};
+	enum OptionStuff {
+		OPT_EMIT_AST=0x000,
+		OPT_EMIT_RUST,
+		OPT_EMIT_C_WRAPPER=0x004
+	};
 	bool dumpAst;
 } gOptions;
 

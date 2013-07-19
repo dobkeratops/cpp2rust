@@ -1,4 +1,6 @@
 #define EMIT printf
+void emitRust(const AstNode& n,int depth=0) ;
+
 template<typename C, typename F,typename S>
 void apply_separated( C& items, const F& main_item_function, const S& separating_function) {
 
@@ -126,6 +128,43 @@ void emitRust_Destructor(const AstNode& n, int depth, const char* selfType) {
 }
 
 void
+emitRust_InnerDecls(const AstNode& n, const vector<CpAstNode>& decls, int depth) {
+	EMIT("mod %s {\n", n.name.c_str());
+	for (auto&sn: decls)
+		emitRust(*sn, depth+1);
+	EMIT("}\n");
+}
+
+void
+emitRust_Enum(const AstNode& n, int depth) {
+	vector<CpAstNode>	decls;
+	n.filter(CXCursor_EnumConstantDecl,decls);
+	EMIT("enum %s {\n",n.name.c_str());
+	int	i;
+	int	enumValue=0;
+	for (i=0; i<decls.size(); i++) {
+		auto d=decls[i];
+		EMIT("\t%s", d->name.c_str());
+		if (d->subNodes.size()) {
+			// we have a value..
+			auto valueNode=
+				d->findFirstRec(CXCursor_IntegerLiteral);
+			if (valueNode) {
+				//TODO-where is the literal value?!
+//				printf("using literal value %s\n",valueNode->name.c_str());
+//				exit(0);
+			}
+		}
+		EMIT("=%d", enumValue);
+		if (i<decls.size()-1)
+			EMIT(",");
+		EMIT("\n");
+		enumValue++;
+	}
+	EMIT("}\n");
+}
+
+void
 emitRust_ClassTemplate(const AstNode& n, int depth) 
 {
 
@@ -137,6 +176,18 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 	n.filter(CXCursor_FieldDecl, fields);
 	vector<CpAstNode> methods;
 	n.filter(CXCursor_CXXMethod, methods);
+	vector<CpAstNode> innerDecls;
+
+	n.filter(CXCursor_StructDecl, innerDecls);
+	n.filter(CXCursor_ClassDecl, innerDecls);
+	n.filter(CXCursor_ClassTemplate, innerDecls);
+	n.filter(CXCursor_EnumConstantDecl, innerDecls);
+	n.filter(CXCursor_TypedefDecl, innerDecls);
+
+	if (innerDecls.size())
+		emitRust_InnerDecls(n,innerDecls,depth);
+
+	auto base = n.findFirst(CXCursor_CXXBaseSpecifier);
 
 	auto f=n.findFirst(CXCursor_Constructor);
 	if (f)  {
@@ -155,6 +206,9 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 	if (!fields.size()) { EMIT("\t{}\n");}
 	else {
 		EMIT("\t{\n",n.name.c_str());
+		if (base) {
+			EMIT("\tbase:%s,\n",base->name.c_str());
+		}
 		apply_separated(fields,
 			[](CpAstNode& s) {
 				EMIT("\t%s:", s->name.c_str());
@@ -185,11 +239,14 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 		EMIT("}\n");
 	}
 }
-void emitRust(const AstNode& n,int depth=0) 
+
+void emitRust(const AstNode& n,int depth) 
 {	
 	#define EMIT_TYPE(T) \
 		case CXCursor_ ## T: emitRust_ ## T(n,depth); break;
 	switch (n.nodeKind) {
+		case CXCursor_EnumDecl:
+			emitRust_Enum(n,depth);
 		case CXCursor_StructDecl:
 		case CXCursor_ClassTemplate:
 			emitRust_ClassTemplate(n,depth);

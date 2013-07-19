@@ -65,6 +65,7 @@ const char* CXCursorKind_to_str(CXCursorKind k) {
 		IMPL(FunctionDecl)
 		IMPL(VarDecl)
 		IMPL(ParmDecl)
+		IMPL(EnumConstantDecl)
 		IMPL(FieldDecl)
 		IMPL(CXXMethod)
 		IMPL(TypeRef)
@@ -76,6 +77,7 @@ const char* CXCursorKind_to_str(CXCursorKind k) {
 		IMPL(TemplateTemplateParameter)
 		IMPL(NonTypeTemplateParameter)
 		IMPL(CXXTypeidExpr)
+
 
 		IMPL(ClassTemplate)
 		IMPL(UsingDirective)
@@ -94,6 +96,16 @@ const char* CXCursorKind_to_str(CXCursorKind k) {
 		IMPL(CompoundStmt)
 		IMPL(FirstStmt)
 		IMPL(DeclStmt)
+		//IMPL(FirstExpr)
+		//IMPL_TYPE(UnexposedExpr)
+		IMPL(DeclRefExpr)
+		IMPL(FirstExpr)
+
+		IMPL(IntegerLiteral)
+		IMPL(FloatingLiteral)
+		IMPL(StringLiteral)
+		IMPL(CharacterLiteral)
+
 
 	default: sprintf(g_hack,"%d",k);return g_hack;
 	}
