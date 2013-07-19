@@ -11,11 +11,15 @@ info:
 	@echo environment variables:-
 	@echo llvm = $(LLVM)
 
+TEST_OPTS= main.cpp -std=c++11 -x c++ -I/usr/include/x86_64-linux-gnu/c++/4.7/ -I/usr/include/clang/3.2/include
 run: main
-	./main -d main.cpp -std=c++11 -x c++ -I/usr/include/x86_64-linux-gnu/c++/4.7/ -I/usr/include/clang/3.2/include
+	./main -d $(TEST_OPTS)
 
 debug: main
-	gdb --args ./main -d ~/cardemo/ut/ut.h -std=c++11 -x c++ -I/usr/include/x86_64-linux-gnu/c++/4.7/ -I/usr/include/clang/3.2/include
+	gdb --args ./main -d $(TEST_OPTS)
+
+demo: main
+	./main $(TEST_OPTS)
 
 clean:
 	rm ./main

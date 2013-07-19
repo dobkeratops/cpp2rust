@@ -1,0 +1,41 @@
+limited c++ bindings generator for Rust using clang.
+NOT READY FOR USE YET!
+
+cpp2rust <options> <clang options>
+	-d debug dump intermediate AST 
+	-n no other output (debug, emit rust translation)
+
+eg 
+cpp2rust main.cpp -std=c++11 -x c++ -I/usr/include/x86_64-linux/gnu/c++/4.7/ -I/usr/include/clang/3.2/include
+
+C++
+template<typename T>
+class Vector{
+	T	*first,*last,*capacity;
+	...
+}
+class AstNode {
+	string name,nodeType;
+	Vector<AstNode> subNodes;
+}
+
+rust generated equiv
+
+struct Vector<T> {
+	first:*T,
+	last:*T,
+	capacity:*T
+}
+struct AstNode {
+	name:String,
+	type:NodeType,
+	subNodes:Vector<AstNode>
+}
+
+
+intention is to handle a limited subset of C++ with some manual translation of template implementations, but at least allowing parts of C++ interfaces (templated collection classes and methods) to generate close equivalent interfaces for Rust code - generics, structs,impls.
+methods will be emitted with a C++ -> C wrapper, and the struct impls' will callthrough the C wrapper
+
+see my ealier attempt to add this support to Rust bindgen.
+
+i'm more familiar with c++ so I may get further doing this externally, plus perhaps a dedicated tool between the 2 languages can me more focussed.
