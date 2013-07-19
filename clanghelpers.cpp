@@ -77,8 +77,6 @@ const char* CXCursorKind_to_str(CXCursorKind k) {
 		IMPL(NonTypeTemplateParameter)
 		IMPL(CXXTypeidExpr)
 
-
-
 		IMPL(ClassTemplate)
 		IMPL(UsingDirective)
 //		IMPL(CallExpr)
