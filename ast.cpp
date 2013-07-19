@@ -20,10 +20,15 @@ struct AstNode {
 		for (auto& s:subNodes)
 			if (f(s)) results.push_back(&s);
 	}
-	void filter( CXCursorKind k, vector<const AstNode*>& results) const{
+	void filter( CXCursorKind k, vector<const AstNode*>& results,bool recurse=false) const{
 		for (auto& s:subNodes)
 			if (s.nodeKind==k)
 				results.push_back(&s);
+		if(recurse) {
+			for (auto& s:subNodes) {
+				s.filter(k,results,recurse);
+			}
+		}
 	}
 	int count( CXCursorKind k) const{
 		int num=0;

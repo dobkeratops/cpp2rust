@@ -257,7 +257,23 @@ void emitRust(const AstNode& n,int depth)
 		break;
 	}
 
-	for (auto& sn: n.subNodes) {emitRust(sn,depth+1);}
+	for (auto& sn: n.subNodes) {
+		emitRust(sn,depth+1);
+	}
+
+	// Find all the functions which look like methods.
+	// stuff them into an impl.
+	
+	for (auto& sn: n.subNodes) {
+		if (!(sn.nodeKind==CXCursor_FunctionDecl ||
+			sn.nodeKind==CXCursor_FunctionTemplate)) {
+			continue;
+		}
+		auto firstParam=sn.findFirst(CXCursor_ParmDecl);
+		if (!firstParam)
+			continue;
+		auto type=emitRust_Typename(firstParam);
+	}
 	#undef EMIT_TYPE
 }
 #undef EMIT
