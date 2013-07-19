@@ -221,6 +221,8 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 		EMIT("\n}\n");
 	}
 	if  (methods.size()) {
+		// todo: gather overloaded methods 
+		// and emit postfixed types
 		EMIT("impl ");
 		emitRust_GenericTypeParams(typeParams);
 
@@ -262,8 +264,15 @@ void emitRust(const AstNode& n,int depth)
 	}
 
 	// Find all the functions which look like methods.
+	// i.e. first argument type is prefixed
 	// stuff them into an impl.
-	
+	struct ImplHolder {
+		string typeName;
+		vector<CpAstNode>	functions;
+		ImplHolder(const char* nm):typeName(nm){};
+	};
+	vector<ImplHolder> impls;
+
 	for (auto& sn: n.subNodes) {
 		if (!(sn.nodeKind==CXCursor_FunctionDecl ||
 			sn.nodeKind==CXCursor_FunctionTemplate)) {
@@ -273,6 +282,41 @@ void emitRust(const AstNode& n,int depth)
 		if (!firstParam)
 			continue;
 		auto type=emitRust_Typename(firstParam);
+		const char* typeName=type.c_str();
+		if (typeName[0]=='*'||typeName[0]=='&')typeName++;
+		//printf("function %s first type=%s\n",sn.name.c_str(),type.c_str());
+		const char* s1,*s2;
+		char lastMatch=0;
+		for (s1=sn.name.c_str(),s2=typeName; *s1&&*s1 && *s1==*s2; s1++,s2++) {
+			//scan until first break;
+		}
+		// did we get the whole typename as a prefix?
+		if (*s2)
+			continue;
+		//printf("function prefixed with typename: %s\n", type.c_str());
+		// TODO-use a Map ffs.
+		ImplHolder* h; size_t i;
+		// get impl holder for this type..
+		for (i=0;i<impls.size();i++) {
+			auto &im=impls[i];
+			if (im.typeName==typeName)
+				break;
+		}
+		if (i==impls.size()) {
+			impls.push_back(ImplHolder(typeName));
+		}
+		h=&impls[i];
+		h->functions.push_back(&sn);
+	}
+	for (auto &im:impls) {
+		EMIT("impl %s {\n",im.typeName.c_str());
+		// todo: get the method name part.
+		for (auto& f:im.functions) {
+			EMIT("//\t%s\n", f->name.c_str());
+			// todo: emit the function body
+			// ..reuse function from the argument wrapper
+		}
+		EMIT("}\n");
 	}
 	#undef EMIT_TYPE
 }
