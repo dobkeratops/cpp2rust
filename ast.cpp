@@ -7,7 +7,7 @@ struct AstNode {
 	CXType	cxType;
 	vector<AstNode>	subNodes;	
 	AstNode() {};
-	AstNode(CXCursorKind& k, const char* n,const char* tn, CXType cxt) {
+	AstNode(const CXCursorKind k, const char* n,const char* tn, CXType cxt) {
 		nodeKind=k; name=n; typeName=tn; cxType=cxt;
 	}
 	AstNode* getSubOfType(CXCursorKind k) {

@@ -34,7 +34,11 @@ struct AstNode {
 
 
 intention is to handle a limited subset of C++ with some manual translation of template implementations, but at least allowing parts of C++ interfaces (templated collection classes and methods) to generate close equivalent interfaces for Rust code - generics, structs,impls.
-methods will be emitted with a C++ -> C wrapper, and the struct impls' will callthrough the C wrapper
+
+the main thing is to get some view of c++ structs with collections and member functions, there is no need to handle everything.
+
+methods will be emitted with a C++ -> C wrapper, and the struct impls' will callthrough the C wrapper.
+Working with my own C++ sourcebases, I can adapt to whatever subset i support; for personal use i can manually correct/fill in blanks.
 
 see my ealier attempt to add this support to Rust bindgen.
 

@@ -98,6 +98,11 @@ struct Options{
 	bool dumpAst;
 } gOptions;
 
+template<typename T>
+struct Vector {
+	T* first,*last,*capacity;
+};
+
 int parseArgs(int argc, const char** argv) 
 {
 	// TODO- Filter which namespaces to emit.
