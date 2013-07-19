@@ -9,7 +9,7 @@ void copyName(CXString src, char* dst, int maxLen)
 }
 
 
-const char* CXType_to_str(CXType& t) {
+const char* CXType_to_str(const CXType& t) {
 	switch (t.kind) {
 	IMPL_TYPE(Void)
 	IMPL_TYPE(Bool)

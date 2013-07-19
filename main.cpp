@@ -97,7 +97,12 @@ void testVisit(CXTranslationUnit tu) {
 struct Options{
 	bool dumpAst;
 } gOptions;
-int parseArgs(int argc, const char** argv) {
+
+int parseArgs(int argc, const char** argv) 
+{
+	// TODO- Filter which namespaces to emit.
+	// dont emit std:: by default?
+
 	int	myargs=0;
 	for (int i=0; i<argc; i++) if (!strcmp(argv[i],"-d")){ gOptions.dumpAst=true;myargs=i;}
 	return myargs;

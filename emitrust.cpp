@@ -1,14 +1,45 @@
-template<typename COLLECTION, typename F,typename SEPERATOR>
-void apply_separated(COLLECTION& items, const F& f, const SEPERATOR& s) {
+template<typename C, typename F,typename S>
+void apply_separated(C& items, const F& main_item_function, const S& separating_function) {
 
 	for (auto&item: items) {
-		f(item);
-		if (&item!= &items.back()) s(item);
+		main_item_function(item);
+		if (&item!= &items.back()) separating_function(item);
 	}
 }
+string emitRust_Typename(const AstNode* n);
+string emitRust_TypenameSub(const AstNode* n) {
+	switch (n->nodeKind) {
+		case CXCursor_TypeRef:
+			return string(n->name)+" ";
+		break;
+	}
+	return emitRust_Typename(n);
+}
+
+string emitRust_Typename(const AstNode* n) {
+	//todo: template
+	switch (n->cxType.kind) {
+	case CXType_Record:
+	case CXType_LValueReference:
+		if (n->subNodes.size())
+			return string("&")+emitRust_TypenameSub(&n->subNodes[0]);
+		else return string("&UNKNOWN");
+	break;
+	case CXType_Typedef:
+		if (n->subNodes.size())
+			return emitRust_TypenameSub(&n->subNodes[0]);
+		else return string("&UNKNOWN");
+
+	break;
+	default:
+		return string(CXType_to_str(n->cxType));
+	}
+}
+
 void
 emitRust_ClassTemplate(const AstNode& n, int depth) 
 {
+
 	// filter template params...
 //	n.filter([](AstNode& n){ if (n==XCursor_TemplateT)}
 	vector<CpAstNode> params;
@@ -40,7 +71,8 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 		printf("\t{\n",n.name.c_str());
 		apply_separated(fields,
 			[](CpAstNode& s) {
-				printf("\t%s:%s", s->name.c_str(), s->typeName.c_str() );
+				printf("\t%s:", s->name.c_str());
+				printf("%s",emitRust_Typename(s).c_str());
 			},
 			[](CpAstNode& s) {
 				printf(",\n");
@@ -52,10 +84,14 @@ emitRust_ClassTemplate(const AstNode& n, int depth)
 
 void emitRust(const AstNode& n,int depth=0) 
 {
+	
 	#define EMIT_TYPE(T) \
 		case CXCursor_ ## T: emitRust_ ## T(n,depth); break;
 	switch (n.nodeKind) {
-	EMIT_TYPE(ClassTemplate)
+		case CXCursor_StructDecl:
+		case CXCursor_ClassTemplate:
+			emitRust_ClassTemplate(n,depth);
+		break;
 	}
 
 	for (auto& sn: n.subNodes) {emitRust(sn,depth+1);}
