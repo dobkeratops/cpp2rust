@@ -6,6 +6,8 @@
 #include <limits>
 #include <stdint.h>
 #include <clang-c/Index.h>
+#include <map>
+#include <set>
 
 //unity build
 using namespace std;
@@ -35,17 +37,6 @@ const char* g_AstNodeNames[]= {
 #include "ast.cpp"
 #include "emitrust.cpp"
 
-template<typename T> T* append(vector<T>& vec,//AstNodeId id, 
-							CXCursorKind k,
-							const char* name) { 
-	int len=vec.size();
-	vec.resize(len+1);
-	auto newItem=&vec[len];
-//	newItem->nodeType = id;
-	newItem->nodeKind = k;
-	newItem->name = name;
-	return	newItem;
-}
 
 CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data) {
 	auto parentNode=(AstNode*) data;
@@ -55,9 +46,13 @@ CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData d
 	clang_getCursorName(cu,elemName,256);
 
 	// create a mirror of the node in C++..
-
-	auto newNode = append(parentNode->subNodes,clang_getCursorKind(cu), elemName);
-	newNode->cxType = clang_getCursorType(cu);
+	CXType ct=clang_getCursorType(cu);
+	CXType returnType=clang_getCursorResultType(cu);
+	
+	CXString typeName=clang_getTypeKindSpelling(ct.kind);
+	auto newNode = parentNode->createSubNode(clang_getCursorKind(cu), elemName,clang_getCString(typeName),ct,returnType);
+	clang_disposeString(typeName);
+	//newNode->cxType = clang_getCursorType(cu);
 	if ((!strcmp(elemName,"std") || (elemName[0]=='_' && elemName[1]=='_'))&& clang_getCursorKind(cu)==CXCursor_Namespace) 
 	{	
 		// omit std namespace!
@@ -65,10 +60,10 @@ CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData d
 	}
 	switch (clang_getCursorKind(cu)) {
 	// dont handle these in out AST mirror
-	case CXCursor_StmtExpr:
-	case CXCursor_CompoundStmt:
-	case CXCursor_FirstStmt:
-	default:
+//	case CXCursor_StmtExpr:
+//	case CXCursor_CompoundStmt:
+//	case CXCursor_FirstStmt:
+//	default:
 		break;
 	// definitely handle these
 	case CXCursor_StructDecl:
@@ -103,6 +98,7 @@ CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData d
 	case CXCursor_CharacterLiteral:
 
 	case CXCursor_DeclRefExpr:
+default:
 	// todo - extract return type? how? it doesn't seem to be there
 		clang_visitChildren(cu, buildMyAstNodes, (CXClientData*) newNode);
 	break;
@@ -131,7 +127,9 @@ struct Options : SomeBase{
 		OPT_EMIT_C_WRAPPER=0x004
 	};
 	bool dumpAst;
-} gOptions;
+};
+
+Options gOptions;
 
 template<typename T>
 struct Vector {
@@ -144,7 +142,9 @@ int parseArgs(int argc, const char** argv)
 	// dont emit std:: by default?
 
 	int	myargs=0;
-	for (int i=0; i<argc; i++) if (!strcmp(argv[i],"-d")){ gOptions.dumpAst=true;myargs=i;}
+	for (int i=0; i<argc; i++)
+		if (!strcmp(argv[i],"-d"))
+			{ gOptions.dumpAst=true;myargs=i;}
 	return myargs;
 }
 int main(int argc, const char** argv) 
@@ -161,9 +161,9 @@ int main(int argc, const char** argv)
 	}
 	AstNode	root;
 	clang_visitChildren(clang_getTranslationUnitCursor(tu), buildMyAstNodes, (CXClientData) &root);
-	if (gOptions.dumpAst)
+	//if (gOptions.dumpAst)
 		dump(root);
-	emitRust(root,0);
+	emitRustRecursive(root,0);
 
 	clang_disposeTranslationUnit(tu);
 	clang_disposeIndex(ix);

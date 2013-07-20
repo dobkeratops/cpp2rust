@@ -1,4 +1,3 @@
-#define IMPL_TYPE(TYPE) case CXType_ ## TYPE : return #TYPE ;
 void copyName(CXString src, char* dst, int maxLen) 
 {
 	const char* cstr=clang_getCString(src);
@@ -10,7 +9,11 @@ void copyName(CXString src, char* dst, int maxLen)
 
 
 const char* CXType_to_str(const CXType& t) {
+	// TODO: Rust translations
+	#define IMPL_TYPE(TYPE) case CXType_ ## TYPE : return #TYPE ;
 	switch (t.kind) {
+	IMPL_TYPE(Invalid)
+	IMPL_TYPE(Unexposed)
 	IMPL_TYPE(Void)
 	IMPL_TYPE(Bool)
 	IMPL_TYPE(Char_U)
@@ -36,17 +39,29 @@ const char* CXType_to_str(const CXType& t) {
 	IMPL_TYPE(NullPtr)
 	IMPL_TYPE(Overload)
 	IMPL_TYPE(Dependent)
+	IMPL_TYPE(ObjCId)
+	IMPL_TYPE(ObjCClass)
+	IMPL_TYPE(ObjCSel)
+	IMPL_TYPE(Complex)
 	IMPL_TYPE(Pointer)
+	IMPL_TYPE(BlockPointer)
 	IMPL_TYPE(LValueReference)
 	IMPL_TYPE(RValueReference)
 	IMPL_TYPE(Record)
 	IMPL_TYPE(Enum)
 	IMPL_TYPE(Typedef)
+	IMPL_TYPE(ObjCInterface)
+	IMPL_TYPE(ObjCObjectPointer)
+	IMPL_TYPE(FunctionNoProto)
+	IMPL_TYPE(FunctionProto)
+	IMPL_TYPE(ConstantArray)
 	IMPL_TYPE(Vector)
-	default: return "?";
+
+//	IMPL_TYPE(FirstBuiltin)=Void
+	default: printf("%x %d",t.data,t.kind);return "?";
 	}
+	#undef IMPL_TYPE
 }
-#undef IMPL_TYPE
 
 void clang_getCursorName(CXCursor cu, char* dst, int maxLen) 
 {
@@ -55,58 +70,11 @@ void clang_getCursorName(CXCursor cu, char* dst, int maxLen)
 	clang_disposeString(name);
 }
 char g_hack[16];
+// sed "s/\s*CXCursor_\([a-zA-Z0-9]*\)\s*=.*/IMPL(\1)/" cxcursor.txt > cxcursor.h + prune duplicates
 const char* CXCursorKind_to_str(CXCursorKind k) {
 #define IMPL(k) case CXCursor_ ## k : return # k; 
 	switch(k) {
-		IMPL(StructDecl)
-		IMPL(ClassDecl)
-		IMPL(UnionDecl)
-		IMPL(Namespace)
-		IMPL(FunctionDecl)
-		IMPL(VarDecl)
-		IMPL(ParmDecl)
-		IMPL(EnumConstantDecl)
-		IMPL(FieldDecl)
-		IMPL(CXXMethod)
-		IMPL(TypeRef)
-		IMPL(MemberRef)
-		IMPL(VariableRef)
-		IMPL(Constructor)
-		IMPL(Destructor)
-		IMPL(TemplateTypeParameter)
-		IMPL(TemplateTemplateParameter)
-		IMPL(NonTypeTemplateParameter)
-		IMPL(CXXTypeidExpr)
-
-
-		IMPL(ClassTemplate)
-		IMPL(UsingDirective)
-//		IMPL(CallExpr)
-		IMPL(FunctionTemplate)
-		IMPL(EnumDecl)
-		IMPL(TypeAliasDecl)
-		IMPL(CXXBaseSpecifier)
-		IMPL(LabelRef)
-		IMPL(TemplateRef)
-		IMPL(NamespaceRef)
-
-		IMPL(CallExpr)
-
-		IMPL(LabelStmt)
-		IMPL(CompoundStmt)
-		IMPL(FirstStmt)
-		IMPL(DeclStmt)
-		//IMPL(FirstExpr)
-		//IMPL_TYPE(UnexposedExpr)
-		IMPL(DeclRefExpr)
-		IMPL(FirstExpr)
-
-		IMPL(IntegerLiteral)
-		IMPL(FloatingLiteral)
-		IMPL(StringLiteral)
-		IMPL(CharacterLiteral)
-
-
+	#include "cxcursor.h"
 	default: sprintf(g_hack,"%d",k);return g_hack;
 	}
 #undef IMPL
