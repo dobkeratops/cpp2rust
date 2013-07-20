@@ -1,4 +1,6 @@
 
+struct AstNode;
+typedef const AstNode* CpAstNode;
 struct AstNode {
 //	AstNodeId	nodeType;
 	AstNode*	parent;
@@ -19,9 +21,9 @@ struct AstNode {
 		this->subNodes.emplace_back(this,k,name,typeName,cxt,result);
 		return (AstNode*)&(this->subNodes.back());
 	}
-template<typename T> T* append(T* parent,vector<T>& vec,//AstNodeId id, 
+template<typename T> fn append(T* parent,vector<T>& vec,//AstNodeId id, 
 							CXCursorKind k,
-							const char* name) { 
+							const char* name)->T* { 
 	int len=vec.size();
 	vec.resize(len+1);
 	auto newItem=&vec[len];
@@ -33,22 +35,22 @@ template<typename T> T* append(T* parent,vector<T>& vec,//AstNodeId id,
 }
 
 	template<typename F>
-	void visit(F& f) const { for (auto &sn:subNodes) f(sn);}
-	bool is(CXCursorKind k)const {return nodeKind==k;}
-	bool is(CXCursorKind k0,CXCursorKind k1)const {return nodeKind==k0||nodeKind==k1;}
-	bool is(CXCursorKind k0,CXCursorKind k1,CXCursorKind k2)const {return nodeKind==k0||nodeKind==k1||nodeKind==k2;}
+	fn visit(F& f) const->void { for (auto &sn:subNodes) f(sn);}
+	fn is(CXCursorKind k)const->bool {return nodeKind==k;}
+	fn is(CXCursorKind k0,CXCursorKind k1)const->bool {return nodeKind==k0||nodeKind==k1;}
+	fn is(CXCursorKind k0,CXCursorKind k1,CXCursorKind k2)const->bool {return nodeKind==k0||nodeKind==k1||nodeKind==k2;}
 
-	AstNode* getSubOfType(CXCursorKind k) {
+	fn getSubOfType(CXCursorKind k)->AstNode* {
 		for(auto& s:subNodes)
 			if (s.nodeKind==k)
 				return &s;
 	}
 	template<typename F>
-	void filter(F& f,vector<const AstNode*>& results) const {
+	fn filter(F& f,vector<const AstNode*>& results) const->void {
 		for (auto& s:subNodes)
 			if (f(s)) results.push_back(&s);
 	}
-	void filter( CXCursorKind k, vector<const AstNode*>& results,bool recurse=false) const{
+	fn filter( CXCursorKind k, vector<const AstNode*>& results,bool recurse=false) const->void {
 		for (auto& s:subNodes)
 			if (s.nodeKind==k)
 				results.push_back(&s);
@@ -58,14 +60,14 @@ template<typename T> T* append(T* parent,vector<T>& vec,//AstNodeId id,
 			}
 		}
 	}
-	int count( CXCursorKind k) const{
+	fn count( CXCursorKind k) const->int{
 		int num=0;
 		for (auto& s:subNodes)
 			if (s.nodeKind==k)
 				num++;
 		return num;
 	}
-	const AstNode* findFirst(CXCursorKind k,bool recurse=false) const {
+	fn findFirst(CXCursorKind k,bool recurse=false) const->CpAstNode {
 		for (auto& s:subNodes) {
 			if (s.nodeKind==k)
 				return &s;
@@ -77,13 +79,12 @@ template<typename T> T* append(T* parent,vector<T>& vec,//AstNodeId id,
 		}
 		return nullptr;
 	}
-	const AstNode* findFirstRec(CXCursorKind k) const { return findFirst(k,true);}
+	fn findFirstRec(CXCursorKind k) const->CpAstNode { return findFirst(k,true);}
 };
-typedef const AstNode* CpAstNode;
 
 
 
-void dump( AstNode& node,int depth=0) {
+fn dump( AstNode& node,int depth=0)->void {
 	int	i;
 	auto indent=[](int d) {
 		for (int i=0; i<d; i++) 

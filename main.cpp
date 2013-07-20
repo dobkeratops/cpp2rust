@@ -18,6 +18,8 @@ using namespace std;
 #define ASSERT(X)
 #endif
 #define dbprintf printf
+#define fn auto
+#define let auto
 
 struct VisitorData {
 	int depth;
@@ -38,7 +40,7 @@ const char* g_AstNodeNames[]= {
 #include "emitrust.cpp"
 
 
-CXChildVisitResult buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data) {
+fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVisitResult {
 	auto parentNode=(AstNode*) data;
 
 	char elemName[256];
@@ -109,7 +111,7 @@ default:
 	return CXChildVisit_Continue;
 }
 
-void testVisit(CXTranslationUnit tu) {
+fn testVisit(CXTranslationUnit tu)->void {
 	
 }
 
@@ -136,7 +138,7 @@ struct Vector {
 	T* first,*last,*capacity;
 };
 
-int parseArgs(int argc, const char** argv) 
+fn parseArgs(int argc, const char** argv)->int 
 {
 	// TODO- Filter which namespaces to emit.
 	// dont emit std:: by default?
@@ -147,7 +149,7 @@ int parseArgs(int argc, const char** argv)
 			{ gOptions.dumpAst=true;myargs=i;}
 	return myargs;
 }
-int main(int argc, const char** argv) 
+fn main(int argc, const char** argv)->int
 {
 	int myArgs=parseArgs(argc,argv); argc-=myArgs;argv+=myArgs;
 	CXIndex ix= clang_createIndex(0,0);

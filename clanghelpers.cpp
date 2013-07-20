@@ -1,4 +1,4 @@
-void copyName(CXString src, char* dst, int maxLen) 
+fn copyName(CXString src, char* dst, int maxLen)->void 
 {
 	const char* cstr=clang_getCString(src);
 	size_t len =strlen(cstr);
@@ -8,7 +8,7 @@ void copyName(CXString src, char* dst, int maxLen)
 }
 
 
-const char* CXType_to_str(const CXType& t) {
+fn CXType_to_str(const CXType& t)->const char* {
 	// TODO: Rust translations
 	#define IMPL_TYPE(TYPE) case CXType_ ## TYPE : return #TYPE ;
 	switch (t.kind) {
@@ -63,7 +63,7 @@ const char* CXType_to_str(const CXType& t) {
 	#undef IMPL_TYPE
 }
 
-void clang_getCursorName(CXCursor cu, char* dst, int maxLen) 
+fn clang_getCursorName(CXCursor cu, char* dst, int maxLen)->void 
 {
 	auto name=clang_getCursorSpelling(cu);
 	copyName(name, dst,maxLen);
@@ -71,7 +71,7 @@ void clang_getCursorName(CXCursor cu, char* dst, int maxLen)
 }
 char g_hack[16];
 // sed "s/\s*CXCursor_\([a-zA-Z0-9]*\)\s*=.*/IMPL(\1)/" cxcursor.txt > cxcursor.h + prune duplicates
-const char* CXCursorKind_to_str(CXCursorKind k) {
+fn CXCursorKind_to_str(CXCursorKind k)->const char* {
 #define IMPL(k) case CXCursor_ ## k : return # k; 
 	switch(k) {
 	#include "cxcursor.h"
