@@ -1,6 +1,8 @@
-#define EMIT printf
+#define EMIT(...) printf(__VA_ARGS__)
+#define EMIT_INDENT(D,...) {indent(D);printf(__VA_ARGS__);}
 fn emitRustRecursive(const AstNode& n,int depth=0)->void;
 fn emitRustItem(const AstNode* item,int depth=0)->bool;
+void indent(int depth) { int i; for (i=0; i<depth; i++) printf("\t");}
 
 template<typename C, typename F,typename S>
 fn apply_separated( C& items, const F& main_item_function, const S& separating_function)->void {
@@ -110,7 +112,7 @@ fn emitRust_FunctionReturnType(const AstNode& n)->string{
 }
 
 fn emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType)->void 	{
-	EMIT("pub fn %s",n.name.c_str());
+	EMIT_INDENT(depth,"pub fn %s",n.name.c_str());
 	vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
 
 	emitRust_GenericTypeParams(typeParams);
@@ -124,7 +126,7 @@ fn emitRust_Constructor(const AstNode& n, int depth, const char* selfType)->void
 	/*
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
-	EMIT("\tpub fn new",n.name.c_str());
+	EMIT_INDENT(depth,"pub fn new",n.name.c_str());
 	emitRust_FunctionArguments(n, depth, nullptr);
 	EMIT("->");
 	EMIT(selfType);
@@ -144,30 +146,30 @@ fn emitRust_Destructor(const AstNode& n, int depth, const char* selfType)->void 
 	/*
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
-	EMIT("\tpub fn drop",n.name.c_str());
+	EMIT_INDENT(depth,"pub fn drop",n.name.c_str());
 	emitRust_FunctionArguments(n, depth, selfType);
 	EMIT(";\n");
 }
 
 
 fn emitRust_InnerDecls(const AstNode& n, const vector<CpAstNode>& decls, int depth)->void {
-	EMIT("mod %s { /* inner declarations of %s\n", n.name.c_str(),n.name.c_str());
+	EMIT_INDENT(depth,"mod %s { // inner declarations of %s\n", n.name.c_str(),n.name.c_str());
 	for (auto&sn: decls) {
 		emitRustItem(sn, depth+1);
 	}
-	EMIT("} // mod %s*/\n",n.name.c_str());
+	EMIT_INDENT(depth,"} //mod %s\n",n.name.c_str());
 }
 
 
 fn emitRust_Enum(const AstNode& n, int depth)->void {
 	vector<CpAstNode>	decls;
 	n.filter(CXCursor_EnumConstantDecl,decls);
-	EMIT("enum %s {\n",n.name.c_str());
+	EMIT_INDENT(depth,"enum %s {\n",n.name.c_str());
 	int	i;
 	int	enumValue=0;
 	for (i=0; i<decls.size(); i++) {
 		auto d=decls[i];
-		EMIT("\t%s", d->name.c_str());
+		EMIT_INDENT(depth+1,"%s", d->name.c_str());
 		if (d->subNodes.size()) {
 			// we have a value..
 			auto valueNode=
@@ -184,7 +186,7 @@ fn emitRust_Enum(const AstNode& n, int depth)->void {
 		EMIT("\n");
 		enumValue++;
 	}
-	EMIT("}\n");
+	EMIT_INDENT(depth,"}\n");
 }
 
 fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
@@ -210,39 +212,40 @@ fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
 
 	auto f=n.findFirst(CXCursor_Constructor);
 	if (f)  {
-		EMIT("impl Drop for %s {\n", n.name.c_str());
+		EMIT_INDENT(depth,"impl Drop for %s {\n", n.name.c_str());
 		emitRust_Destructor(*f,depth+1, n.name.c_str());
-		EMIT("}\n");
+		EMIT_INDENT(depth,"}\n");
 	}
 	// todo - filter what this is really.
 	// only make it a rust struct if it has data elements?
 	// ..otherwise if its a collection of functions/types it's really trait?
 
 	// other metadata for binding ?
-	EMIT("struct\t%s", n.name.c_str());
+	EMIT_INDENT(depth,"struct\t%s", n.name.c_str());
 	emitRust_GenericTypeParams(typeParams);
 
 	if (!fields.size()) { EMIT("\t{}\n");}
 	else {
 		EMIT("\t{\n",n.name.c_str());
 		if (base) {
-			EMIT("\tbase:%s,\n",base->name.c_str());
+			EMIT_INDENT(depth+1,"tbase:%s,\n",base->name.c_str());
 		}
 		apply_separated(fields,
-			[](CpAstNode& s) {
-				EMIT("\t%s:", s->name.c_str());
+			[&](CpAstNode& s) {
+				EMIT_INDENT(depth+1,"%s:", s->name.c_str());
 				EMIT("%s",emitRust_Typename(s).c_str());
 			},
 			[](CpAstNode& s) {
 				EMIT(",\n");
 			}
 		);
-		EMIT("\n}\n");
+		EMIT("\n");
+		EMIT_INDENT(depth,"}\n");
 	}
 	if  (methods.size()) {
 		// todo: gather overloaded methods 
 		// and emit postfixed types
-		EMIT("impl ");
+		EMIT_INDENT(depth,"impl ");
 		emitRust_GenericTypeParams(typeParams);
 
 		EMIT("%s",n.name.c_str());
@@ -254,10 +257,9 @@ fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
 		if (f) 
 			emitRust_Constructor(*f,depth+1, n.name.c_str());
 		for (auto &m:methods) {
-			EMIT("\t");
 			emitRust_FunctionDecl(*m,depth+1, n.name.c_str());
 		}
-		EMIT("}\n");
+		EMIT_INDENT(depth,"}\n");
 	}
 
 	if (innerDecls.size()>0)
@@ -390,7 +392,7 @@ fn emitRustRecursive(const AstNode& n,int depth)->void
 	bool didEmit=emitRustItem(&n,depth);
 	if(!didEmit) {
 		for (auto& sn: n.subNodes) {
-			emitRustRecursive(sn,depth+1);
+			emitRustRecursive(sn,depth);
 		}
 	}
 	emitRust_GatherFunctionsAsMethodsAndTraits(n,depth);
