@@ -39,6 +39,7 @@ const char* g_AstNodeNames[]= {
 #include "ast.cpp"
 #include "emitrust.cpp"
 
+// TODO - yuk, passing a global. make an emitRust object
 
 fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVisitResult {
 	auto parentNode=(AstNode*) data;
@@ -124,11 +125,11 @@ struct Options : SomeBase{
 		int x,y;
 	};
 	enum OptionStuff {
-		OPT_EMIT_AST=0x000,
-		OPT_EMIT_RUST,
-		OPT_EMIT_C_WRAPPER=0x004
+		OPT_FOO,
+		OPT_BAR,
+		OPT_BAZ
 	};
-	bool dumpAst;
+	bool dumpAst, emitRust,emitCpp;
 	Options() {};
 	~Options() {};
 };
@@ -144,11 +145,23 @@ fn parseArgs(int argc, const char** argv)->int
 {
 	// TODO- Filter which namespaces to emit.
 	// dont emit std:: by default?
-
+	gOptions.emitRust=true;
 	int	myargs=0;
-	for (int i=0; i<argc; i++)
+	for (int i=0; i<argc; i++) {
+		// some hardcoded convinient default combinations, TODO handle properly.
 		if (!strcmp(argv[i],"-d"))
-			{ gOptions.dumpAst=true;myargs=i;}
+			{ gOptions.dumpAst=true;myargs=i;gOptions.emitRust=false;}
+		if (!strcmp(argv[i],"-dr"))
+			{ gOptions.dumpAst=true;myargs=i;gOptions.emitRust=true;}
+		if (!strcmp(argv[i],"-c"))
+			{ gOptions.emitCpp=true; gOptions.emitRust=false;gOptions.dumpAst=false;myargs=i;}
+		if (!strcmp(argv[i],"-r"))
+			{ gOptions.emitCpp=false; gOptions.emitRust=true;gOptions.dumpAst=false;myargs=i;}
+		if (!strcmp(argv[i],"-cr"))
+			{ gOptions.emitCpp=true;gOptions.emitRust=true; myargs=i;}
+		if (!strcmp(argv[i],"-dcr"))
+			{ gOptions.dumpAst=true;myargs=i;gOptions.emitCpp=true;gOptions.emitRust=true;}
+	}
 	return myargs;
 }
 fn main(int argc, const char** argv)->int
@@ -167,7 +180,10 @@ fn main(int argc, const char** argv)->int
 	clang_visitChildren(clang_getTranslationUnitCursor(tu), buildMyAstNodes, (CXClientData) &root);
 	//if (gOptions.dumpAst)
 		dump(root);
-	emitRustRecursive(root,0);
+	if (gOptions.emitCpp)
+		emitRustRecursive(EmitRustMode_CppShim, root,0);
+	if (gOptions.emitRust)
+		emitRustRecursive(EmitRustMode_Rust, root,0);
 
 	clang_disposeTranslationUnit(tu);
 	clang_disposeIndex(ix);

@@ -5,7 +5,7 @@ CC=clang  $(LIBS) $(INC)
 CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC)
 
 demo: main
-	./main $(TEST_OPTS)
+	./main -dcr $(TEST_OPTS)
 
 main: main.cpp emitrust.cpp clanghelpers.cpp ast.cpp
 	$(CPP) main.cpp -lclang -o ./main 

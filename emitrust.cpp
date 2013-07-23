@@ -1,7 +1,12 @@
 #define EMIT(...) printf(__VA_ARGS__)
 #define EMIT_INDENT(D,...) {indent(D);printf(__VA_ARGS__);}
-fn emitRustRecursive(const AstNode& n,int depth=0)->void;
-fn emitRustItem(const AstNode* item,int depth=0)->bool;
+enum EmitRustMode {
+	EmitRustMode_Rust=1,
+	EmitRustMode_CppShim
+};
+
+fn emitRustRecursive(EmitRustMode m,const AstNode& n,int depth=0)->void;
+fn emitRustItem(EmitRustMode m,const AstNode* item,int depth=0)->bool;
 void indent(int depth) { int i; for (i=0; i<depth; i++) printf("\t");}
 
 template<typename C, typename F,typename S>
@@ -147,6 +152,7 @@ fn emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType, bool e
 	EMIT(";\n");
 }
 fn emitRust_GlobalFunctionDecl(const AstNode&n, int depth)->void 	{
+	// TODO - filter and dont emit global functions that are already declared "extern "C"
 	EMIT_INDENT(depth,"extern { pub fn %s",n.name.c_str());
 	// TODO - some instantiation of some requested types... 
 	// with a rule for emiting C shims with a naming scheme
@@ -159,6 +165,24 @@ fn emitRust_GlobalFunctionDecl(const AstNode&n, int depth)->void 	{
 
 	EMIT(";}\n");
 }
+
+fn emitCpp2CShim_GlobalFunctionDecl(const AstNode&n, int depth)->void 	{
+	auto rtnType=emitRust_FunctionReturnType_asStr(n);
+	EMIT_INDENT(depth,"extern \"C\" %s %s",rtnType.c_str(), n.name.c_str());
+	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
+	emitRust_FunctionArguments(n,depth,nullptr);
+	EMIT("{");
+	EMIT("return %s(",n.name.c_str());
+	apply_separated(args,
+		[](CpAstNode n) { EMIT(n->name.c_str());},
+		[](CpAstNode n) { EMIT(",");}
+	);
+	EMIT(");");
+//	emitCpp_FunctionArguments(n,depth,nullptr);
+
+	EMIT("};\n");
+}
+
 
 fn emitRust_Constructor(const AstNode& n, int depth, const char* selfType,bool emitCShim)->void {
 	/*
@@ -204,7 +228,7 @@ fn emitRust_Destructor(const AstNode& n, int depth, const char* selfType, bool e
 fn emitRust_InnerDecls(const AstNode& n, const vector<CpAstNode>& decls, int depth)->void {
 	EMIT_INDENT(depth,"mod %s { // inner declarations of %s\n", n.name.c_str(),n.name.c_str());
 	for (auto&sn: decls) {
-		emitRustItem(sn, depth+1);
+		emitRustItem(EmitRustMode_Rust, sn, depth+1);
 	}
 	EMIT_INDENT(depth,"} //mod %s\n",n.name.c_str());
 }
@@ -238,6 +262,9 @@ fn emitRust_Enum(const AstNode& n, int depth)->void {
 	EMIT_INDENT(depth,"}\n");
 }
 
+fn emitCpp2CShim_ClassTemplate(const AstNode& n, int depth)->void {
+	EMIT("\\ %sTODO",__FUNCTION__);
+}
 fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
 {
 
@@ -425,22 +452,33 @@ fn emitRust_GatherFunctionsAsMethodsAndTraits(const AstNode& n,int depth)->void{
 	#undef EMIT_TYPE
 }
 
-fn emitRustItem(const AstNode* n,int depth)->bool
+fn emitRustItem(EmitRustMode m,const AstNode* n,int depth)->bool
 {
-	switch (n->nodeKind) {
-		case CXCursor_EnumDecl:
-			emitRust_Enum(*n,depth);
-			return	 true;
-		case CXCursor_StructDecl:
-		case CXCursor_ClassTemplate:
-			emitRust_ClassTemplate(*n,depth);
-			return true;
-		break;
-		case CXCursor_FunctionDecl:
-		case CXCursor_FunctionTemplate:
-			emitRust_GlobalFunctionDecl(*n,depth);
-			return 	true;
-		break;
+	if (m==EmitRustMode_Rust) {
+		switch (n->nodeKind) {
+			case CXCursor_EnumDecl:
+				emitRust_Enum(*n,depth);
+				return	 true;
+			case CXCursor_StructDecl:
+			case CXCursor_ClassTemplate:
+				emitRust_ClassTemplate(*n,depth);
+			break;
+			case CXCursor_FunctionDecl:
+			case CXCursor_FunctionTemplate:
+				emitRust_GlobalFunctionDecl(*n,depth);
+				return 	true;
+			break;
+		}
+	} else {
+		switch (n->nodeKind) {
+			case CXCursor_ClassTemplate:
+				emitCpp2CShim_ClassTemplate(*n,depth);
+			break;
+			case CXCursor_FunctionDecl:
+			case CXCursor_FunctionTemplate:
+				emitCpp2CShim_GlobalFunctionDecl(*n,depth);
+			break;
+		}
 	}
 	return false;
 }
@@ -452,14 +490,14 @@ fn emitRustItem(const AstNode* n,int depth)->bool
 //
 //
 
-fn emitRustRecursive(const AstNode& n,int depth)->void
-{	
+fn emitRustRecursive(EmitRustMode m,const AstNode& n,int depth)->void
+{
 	#define EMIT_TYPE(T) \
 		case CXCursor_ ## T: emitRust_ ## T(n,depth); break;
-	bool didEmit=emitRustItem(&n,depth);
+	bool didEmit=emitRustItem(m,&n,depth);
 	if(!didEmit) {
 		for (auto& sn: n.subNodes) {
-			emitRustRecursive(sn,depth);
+			emitRustRecursive(m,sn,depth);
 		}
 	}
 	emitRust_GatherFunctionsAsMethodsAndTraits(n,depth);
