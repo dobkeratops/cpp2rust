@@ -96,7 +96,7 @@ fn emitRust_FunctionArguments(const AstNode&n, int depth,const char* selfType)->
 	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
 	EMIT("(");
 	if (selfType) {
-		EMIT("self"); if (args.size()) EMIT(",");
+		EMIT("&self"); if (args.size()) EMIT(",");
 	}
 	apply_separated(args,
 		[](CpAstNode& s) {
@@ -111,18 +111,44 @@ fn emitRust_FunctionReturnType(const AstNode& n)->string{
 	return emitRust_Typename(&n,true);
 }
 
-fn emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType)->void 	{
+fn emitRust_CShimArgs(const AstNode& n, int depth, const char* selfType)->void {
+	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
+	EMIT("(");
+	EMIT("self%s",args.size()?",":"");
+	apply_separated(args,
+		[](CpAstNode& a) {
+			EMIT("%s",a->name.c_str());
+		},
+		[](CpAstNode& a) {
+			EMIT(",");
+		}
+	);
+
+	EMIT(")");
+}
+
+fn emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType, bool emitCShim)->void 	{
 	EMIT_INDENT(depth,"pub fn %s",n.name.c_str());
 	vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
+	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
 
 	emitRust_GenericTypeParams(typeParams);
 	emitRust_FunctionArguments(n,depth,selfType);
 	EMIT("->%s",emitRust_FunctionReturnType(n).c_str());
-	// todo: return type;
+
+	if (emitCShim && selfType) {
+		EMIT("{\n");
+		EMIT_INDENT(depth+1,"unsafe { %s_%s",selfType,n.name.c_str());
+		emitRust_CShimArgs(n,depth,selfType);
+		EMIT(" }\n");
+		EMIT_INDENT(depth,"}");
+
+	}
+
 	EMIT(";\n");
 }
 
-fn emitRust_Constructor(const AstNode& n, int depth, const char* selfType)->void {
+fn emitRust_Constructor(const AstNode& n, int depth, const char* selfType,bool emitCShim)->void {
 	/*
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
@@ -130,6 +156,15 @@ fn emitRust_Constructor(const AstNode& n, int depth, const char* selfType)->void
 	emitRust_FunctionArguments(n, depth, nullptr);
 	EMIT("->");
 	EMIT(selfType);
+
+	if (selfType && emitCShim) {
+		EMIT("{\n");
+		EMIT_INDENT(depth+1,"unsafe{ new_%s",n.name.c_str());
+		emitRust_CShimArgs(n,depth,selfType);
+		EMIT("}\n");
+		EMIT_INDENT(depth,"}");
+	}
+
 	EMIT(";\n");
 }
 
@@ -142,12 +177,14 @@ fn emitRust_FindDefaultConstructor(const AstNode& n)->CpAstNode {
 	return n.findFirst(CXCursor_Constructor);
 }
 
-fn emitRust_Destructor(const AstNode& n, int depth, const char* selfType)->void {
+fn emitRust_Destructor(const AstNode& n, int depth, const char* selfType, bool emitCShim)->void {
 	/*
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
-	EMIT_INDENT(depth,"pub fn drop",n.name.c_str());
-	emitRust_FunctionArguments(n, depth, selfType);
+	EMIT_INDENT(depth,"pub fn drop(&self)",n.name.c_str());
+	if (emitCShim && selfType) {
+		EMIT("{ unsafe { delete_%s(self)} }", selfType);
+	}
 	EMIT(";\n");
 }
 
@@ -213,7 +250,7 @@ fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
 	auto f=n.findFirst(CXCursor_Constructor);
 	if (f)  {
 		EMIT_INDENT(depth,"impl Drop for %s {\n", n.name.c_str());
-		emitRust_Destructor(*f,depth+1, n.name.c_str());
+		emitRust_Destructor(*f,depth+1, n.name.c_str(),true);
 		EMIT_INDENT(depth,"}\n");
 	}
 	// todo - filter what this is really.
@@ -255,9 +292,9 @@ fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
 //		auto f=n.findFirst(CXCursor_Constructor);
 		auto f=emitRust_FindDefaultConstructor(n);
 		if (f) 
-			emitRust_Constructor(*f,depth+1, n.name.c_str());
+			emitRust_Constructor(*f,depth+1, n.name.c_str(),true);
 		for (auto &m:methods) {
-			emitRust_FunctionDecl(*m,depth+1, n.name.c_str());
+			emitRust_FunctionDecl(*m,depth+1, n.name.c_str(), true);
 		}
 		EMIT_INDENT(depth,"}\n");
 	}
@@ -371,7 +408,7 @@ fn emitRustItem(const AstNode* n,int depth)->bool
 		break;
 		case CXCursor_FunctionDecl:
 		case CXCursor_FunctionTemplate:
-			emitRust_FunctionDecl(*n,depth,nullptr);
+			emitRust_FunctionDecl(*n,depth,nullptr,false);
 			return 	true;
 		break;
 	}

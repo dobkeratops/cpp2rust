@@ -1,5 +1,7 @@
 limited c++ bindings generator for Rust using clang.
-NOT READY FOR USE YET!
+"make" runs demo of sample file to stdout
+
+Not ready for automatic use yet, but might generate something where you can manually patch over issues to get a binding working.
 
 cpp2rust <options> <clang options>
 	-d debug dump intermediate AST 
@@ -17,6 +19,7 @@ class Vector{
 class AstNode {
 	string name,nodeType;
 	Vector<AstNode> subNodes;
+	void dumpNodes(int depth);
 }
 
 rust generated equiv
@@ -30,6 +33,9 @@ struct AstNode {
 	name:String,
 	type:NodeType,
 	subNodes:Vector<AstNode>
+}
+impl AstNode {
+	fn dumpNodes(self,depth:int){};
 }
 
 
