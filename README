@@ -1,7 +1,6 @@
 limited c++ bindings generator for Rust using clang.
 "make" runs demo of sample file to stdout
-
-Not ready for automatic use yet, but might generate something where you can manually patch over issues to get a binding working.
+very limited,will probably need some manual patching over issues
 
 cpp2rust <options> <clang options>
 	-d debug dump intermediate AST 
@@ -10,7 +9,7 @@ cpp2rust <options> <clang options>
 eg 
 cpp2rust main.cpp -std=c++11 -x c++ -I/usr/include/x86_64-linux/gnu/c++/4.7/ -I/usr/include/clang/3.2/include
 
-C++
+C++ INPUT
 template<typename T>
 class Vector{
 	T	*first,*last,*capacity;
@@ -19,10 +18,11 @@ class Vector{
 class AstNode {
 	string name,nodeType;
 	Vector<AstNode> subNodes;
-	void dumpNodes(int depth);
+	void dumpNode(int depth);
+	void foo(int value);
 }
 
-rust generated equiv
+GENERATED RUST OUTPUT
 
 struct Vector<T> {
 	first:*T,
@@ -35,8 +35,11 @@ struct AstNode {
 	subNodes:Vector<AstNode>
 }
 impl AstNode {
-	fn dumpNodes(self,depth:int){};
+	fn dumpNode(self,depth:int){ AstNode_dumpNodes(self,depth)};
+	fn foo(self,depth:int){ AstNode_foo(self,depth)};
 }
+extern{fn AstNode_dumpNodes(self_ptr:*AstNode,depth:int);}
+extern{fn AstNode_foo(self_ptr:*AstNode,value:int);}
 
 
 intention is to handle a limited subset of C++ with some manual translation of template implementations, but at least allowing parts of C++ interfaces (templated collection classes and methods) to generate close equivalent interfaces for Rust code - generics, structs,impls.
