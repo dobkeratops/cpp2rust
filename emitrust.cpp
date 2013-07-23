@@ -72,7 +72,7 @@ fn emitRust_Typename(const AstNode* n,bool retnType)->string {
 			return ret;
 		}
 		else
-			return string(CXType_to_str(*cxType));
+			return string(CXType_to_str(*cxType,true));
 	}
 }
 
@@ -107,7 +107,7 @@ fn emitRust_FunctionArguments(const AstNode&n, int depth,const char* selfType)->
 	);
 	EMIT(")");
 }
-fn emitRust_FunctionReturnType(const AstNode& n)->string{
+fn emitRust_FunctionReturnType_asStr(const AstNode& n)->string{
 	return emitRust_Typename(&n,true);
 }
 
@@ -127,16 +127,15 @@ fn emitRust_CShimArgs(const AstNode& n, int depth, const char* selfType)->void {
 	EMIT(")");
 }
 
-fn emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType, bool emitCShim)->void 	{
+fn emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType, bool emitRustToCShimCall)->void 	{
 	EMIT_INDENT(depth,"pub fn %s",n.name.c_str());
 	vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
 	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
-
 	emitRust_GenericTypeParams(typeParams);
 	emitRust_FunctionArguments(n,depth,selfType);
-	EMIT("->%s",emitRust_FunctionReturnType(n).c_str());
+	EMIT("->%s",emitRust_FunctionReturnType_asStr(n).c_str());
 
-	if (emitCShim && selfType) {
+	if (emitRustToCShimCall && selfType) {
 		EMIT("{\n");
 		EMIT_INDENT(depth+1,"unsafe { %s_%s",selfType,n.name.c_str());
 		emitRust_CShimArgs(n,depth,selfType);
@@ -146,6 +145,19 @@ fn emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType, bool e
 	}
 
 	EMIT(";\n");
+}
+fn emitRust_GlobalFunctionDecl(const AstNode&n, int depth)->void 	{
+	EMIT_INDENT(depth,"extern { pub fn %s",n.name.c_str());
+	// TODO - some instantiation of some requested types... 
+	// with a rule for emiting C shims with a naming scheme
+	//vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
+	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
+	//emitRust_GenericTypeParams(typeParams);
+	emitRust_FunctionArguments(n,depth,nullptr);
+	EMIT("->%s",emitRust_FunctionReturnType_asStr(n).c_str());
+
+
+	EMIT(";}\n");
 }
 
 fn emitRust_Constructor(const AstNode& n, int depth, const char* selfType,bool emitCShim)->void {
@@ -247,10 +259,10 @@ fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
 
 	auto base = n.findFirst(CXCursor_CXXBaseSpecifier);
 
-	auto f=n.findFirst(CXCursor_Constructor);
-	if (f)  {
+	auto dtr=n.findFirst(CXCursor_Destructor);
+	if (dtr)  {
 		EMIT_INDENT(depth,"impl Drop for %s {\n", n.name.c_str());
-		emitRust_Destructor(*f,depth+1, n.name.c_str(),true);
+		emitRust_Destructor(*dtr,depth+1, n.name.c_str(),true);
 		EMIT_INDENT(depth,"}\n");
 	}
 	// todo - filter what this is really.
@@ -290,14 +302,32 @@ fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
 
 		EMIT(" {\n" );
 //		auto f=n.findFirst(CXCursor_Constructor);
-		auto f=emitRust_FindDefaultConstructor(n);
-		if (f) 
-			emitRust_Constructor(*f,depth+1, n.name.c_str(),true);
+		auto ctr=emitRust_FindDefaultConstructor(n);
+		if (ctr) 
+			emitRust_Constructor(*ctr,depth+1, n.name.c_str(),true);
 		for (auto &m:methods) {
 			emitRust_FunctionDecl(*m,depth+1, n.name.c_str(), true);
 		}
 		EMIT_INDENT(depth,"}\n");
+		if (ctr) {
+			EMIT_INDENT(depth,"extern{ fn new_%s",n.name.c_str());
+			emitRust_FunctionArguments(*ctr,depth,nullptr);
+			EMIT("->*%s;}\n",n.name.c_str(),n.name.c_str(),n.name.c_str());
+		}
+		// emit C shim prototypes..
+		for (auto &m:methods) {	
+			EMIT_INDENT(depth,"extern{ fn %s_%s",n.name.c_str(),m->name.c_str());
+			emitRust_FunctionArguments(*m,depth,n.name.c_str());
+			EMIT("->%s;",emitRust_FunctionReturnType_asStr(*m).c_str());
+			EMIT("}\n");
+		}
 	}
+	if (dtr) {
+		EMIT_INDENT(depth,"extern{ fn delete_%s(&self_ptr:*%s);}\n",n.name.c_str(),n.name.c_str())
+	}
+
+	
+
 
 	if (innerDecls.size()>0)
 		emitRust_InnerDecls(n,innerDecls,depth);
@@ -408,7 +438,7 @@ fn emitRustItem(const AstNode* n,int depth)->bool
 		break;
 		case CXCursor_FunctionDecl:
 		case CXCursor_FunctionTemplate:
-			emitRust_FunctionDecl(*n,depth,nullptr,false);
+			emitRust_GlobalFunctionDecl(*n,depth);
 			return 	true;
 		break;
 	}

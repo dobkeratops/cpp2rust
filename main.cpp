@@ -129,6 +129,8 @@ struct Options : SomeBase{
 		OPT_EMIT_C_WRAPPER=0x004
 	};
 	bool dumpAst;
+	Options() {};
+	~Options() {};
 };
 
 Options gOptions;
