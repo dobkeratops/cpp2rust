@@ -4,6 +4,9 @@ CC=clang  $(LIBS) $(INC)
 
 CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC)
 
+demo: main
+	./main $(TEST_OPTS)
+
 main: main.cpp emitrust.cpp clanghelpers.cpp ast.cpp
 	$(CPP) main.cpp -lclang -o ./main 
 
@@ -18,8 +21,6 @@ run: main
 debug: main
 	gdb --args ./main -d $(TEST_OPTS)
 
-demo: main
-	./main $(TEST_OPTS)
 
 clean:
 	rm ./main
