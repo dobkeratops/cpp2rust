@@ -4,11 +4,21 @@ CC=clang  $(LIBS) $(INC)
 
 CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC)
 
+
+# grep  "fn\s*\w*::\w\(.*\).*{" ast.cpp |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > ast_methods.h && more ast_methods.h
+
+
 demo: main
 	./main -w testoutput -dcr $(TEST_OPTS)
 
-main: main.cpp emitrust.cpp clanghelpers.cpp ast.cpp
+main: main.cpp emitrust.cpp clanghelpers.cpp ast.cpp ast_methods.h
 	$(CPP) main.cpp -lclang -o ./main 
+
+# TODO- rule for every _methods.h from every .cpp
+
+ast_methods.h : ast.cpp
+	grep  "fn\s*\w*::\w\(.*\).*{" ast.cpp |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > ast_methods.h && more ast_methods.h
+
 
 info:
 	@echo environment variables:-
