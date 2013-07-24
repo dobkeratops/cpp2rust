@@ -7,9 +7,15 @@ CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC)
 
 # grep  "fn\s*\w*::\w\(.*\).*{" ast.cpp |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > ast_methods.h && more ast_methods.h
 
+TEST_CMD=./main -w testoutput -dcr $(TEST_OPTS)
 
 demo: main
-	./main -w testoutput -dcr $(TEST_OPTS)
+	$(TEST_CMD)
+	@echo output:-
+	cat testoutput.rs
+	@echo
+	@echo "generated testoutput.rs testoutput.cpp from invocation:"
+	@echo $(TEST_CMD)
 
 
 

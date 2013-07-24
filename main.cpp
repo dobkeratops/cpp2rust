@@ -21,6 +21,11 @@ using namespace std;
 #define fn auto
 #define let auto
 
+enum EmitLang {
+	EL_RUST,
+	EL_CPP
+};
+
 struct VisitorData {
 	int depth;
 };
