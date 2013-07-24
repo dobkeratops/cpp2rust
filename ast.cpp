@@ -33,9 +33,6 @@ fn AstNode::findFirstRec(CXCursorKind k) const->CpAstNode {
 	return findFirst(k,true);
 }
 
-
-
-
 fn dump( AstNode& node,int depth=0)->void {
 	int	i;
 	auto indent=[](int d) {
@@ -58,6 +55,5 @@ fn dump( AstNode& node,int depth=0)->void {
 		indent(depth); 
 	}
 	dbprintf(")\n");
-
 }
 

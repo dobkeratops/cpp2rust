@@ -50,5 +50,6 @@ struct AstNode {
 		for (auto& s:subNodes)
 			if (f(s)) results.push_back(&s);
 	}
-	#include "ast_methods.h"
+	
+	#include "ast.hxx"
 };

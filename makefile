@@ -11,13 +11,17 @@ CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC)
 demo: main
 	./main -w testoutput -dcr $(TEST_OPTS)
 
-main: main.cpp emitrust.cpp clanghelpers.cpp ast.cpp ast_methods.h
+
+
+main: main.cpp emitrust.cpp clanghelpers.cpp ast.cpp ast.hxx ast.h
 	$(CPP) main.cpp -lclang -o ./main 
 
 # TODO- rule for every _methods.h from every .cpp
 
-ast_methods.h : ast.cpp
-	grep  "fn\s*\w*::\w\(.*\).*{" ast.cpp |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > ast_methods.h && more ast_methods.h
+ast.hxx: ast.cpp
+	grep  "fn\s*\w*::\w\(.*\).*{" $< |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > $@
+
+
 
 
 info:
@@ -33,4 +37,5 @@ debug: main
 
 
 clean:
+	rm *.hxx
 	rm ./main
