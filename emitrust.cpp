@@ -1,5 +1,5 @@
-#define EMIT(...) printf(__VA_ARGS__)
-#define EMIT_INDENT(D,...) {indent(D);printf(__VA_ARGS__);}
+#define EMIT(...) fprintf(gOut, __VA_ARGS__)
+#define EMIT_INDENT(D,...) {indent(D);fprintf(gOut,__VA_ARGS__);}
 enum EmitRustMode {
 	EmitRustMode_Rust=1,
 	EmitRustMode_CppShim
@@ -7,7 +7,7 @@ enum EmitRustMode {
 
 fn emitRustRecursive(EmitRustMode m,const AstNode& n,int depth=0)->void;
 fn emitRustItem(EmitRustMode m,const AstNode* item,int depth=0)->bool;
-void indent(int depth) { int i; for (i=0; i<depth; i++) printf("\t");}
+void indent(int depth) { int i; for (i=0; i<depth; i++) fprintf(gOut, "\t");}
 
 template<typename C, typename F,typename S>
 fn apply_separated( C& items, const F& main_item_function, const S& separating_function)->void {

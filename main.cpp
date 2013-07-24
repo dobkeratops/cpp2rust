@@ -33,7 +33,7 @@ const char* g_AstNodeNames[]= {
 };
 */
 
-
+FILE* gOut; // TODO - yuk, instead of global pass a context object.
 
 #include "clanghelpers.cpp"
 #include "ast.cpp"
@@ -140,15 +140,18 @@ template<typename T>
 struct Vector {
 	T* first,*last,*capacity;
 };
-
+string gOutputFilename("cpp2rust_output");
 fn parseArgs(int argc, const char** argv)->int 
 {
 	// TODO- Filter which namespaces to emit.
 	// dont emit std:: by default?
-	gOptions.emitRust=true;
 	int	myargs=0;
 	for (int i=0; i<argc; i++) {
 		// some hardcoded convinient default combinations, TODO handle properly.
+		if (!strcmp(argv[i],"-w")) {
+			gOutputFilename=string(argv[i+1]);
+			i+=2;
+		}
 		if (!strcmp(argv[i],"-d"))
 			{ gOptions.dumpAst=true;myargs=i;gOptions.emitRust=false;}
 		if (!strcmp(argv[i],"-dr"))
@@ -178,12 +181,23 @@ fn main(int argc, const char** argv)->int
 	}
 	AstNode	root;
 	clang_visitChildren(clang_getTranslationUnitCursor(tu), buildMyAstNodes, (CXClientData) &root);
-	//if (gOptions.dumpAst)
+
+	if (gOptions.dumpAst) {
 		dump(root);
-	if (gOptions.emitCpp)
+	}
+	if (gOptions.emitCpp) {
+		auto fname=gOutputFilename+string(".cpp");
+		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
 		emitRustRecursive(EmitRustMode_CppShim, root,0);
-	if (gOptions.emitRust)
+		if (fp) {fclose(fp);gOut=stdout;}
+	}
+	if (gOptions.emitRust) {
+		auto fname=gOutputFilename+string(".rs");
+		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
 		emitRustRecursive(EmitRustMode_Rust, root,0);
+		if (fp) {fclose(fp);gOut=stdout;}
+	}
+	// no options given , write files..
 
 	clang_disposeTranslationUnit(tu);
 	clang_disposeIndex(ix);

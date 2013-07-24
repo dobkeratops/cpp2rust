@@ -4,12 +4,14 @@ very limited,will probably need some manual patching over issues
 
 cpp2rust <options> <clang options>
 	-d debug dump intermediate AST 
+	-cr write cpp2c shim, rust calls to c shim, method wrappers for those.
 	-n no other output (debug, emit rust translation)
-
+	-w set output base filename (default, "output") , will be postfixed with .rs, .cpp
 eg 
 cpp2rust main.cpp -std=c++11 -x c++ -I/usr/include/x86_64-linux/gnu/c++/4.7/ -I/usr/include/clang/3.2/include
 
-C++ INPUT
+C++ INPUT:-
+----------
 template<typename T>
 class Vector{
 	T	*first,*last,*capacity;
@@ -22,7 +24,8 @@ class AstNode {
 	void foo(int value);
 }
 
-GENERATED RUST OUTPUT
+GENERATED RUST OUTPUT:-
+-----------------------
 
 struct Vector<T> {
 	first:*T,
