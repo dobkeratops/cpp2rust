@@ -82,8 +82,16 @@ fn testVisit(CXTranslationUnit tu)->void {
 	
 }
 
+struct Banana{
+	int x,y,z;
+};
+
 struct SomeBase {
 	int count;
+	void Foo(int x,float f);
+	void Bar(const char* x);
+	int Baz(SomeBase* a,Banana& b);
+	SomeBase Baz(vector<Banana>& b);
 };
 
 struct Options : SomeBase{
@@ -151,16 +159,16 @@ fn main(int argc, const char** argv)->int
 	if (gOptions.dumpAst) {
 		dump(root,0);
 	}
-	if (gOptions.emitCpp) {
-		auto fname=gOutputFilename+std::string(".cpp");
-		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
-		emitRustRecursive(EmitRustMode_CppShim, root,0);
-		if (fp) {fclose(fp);gOut=stdout;}
-	}
 	if (gOptions.emitRust) {
 		auto fname=gOutputFilename+std::string(".rs");
 		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
 		emitRustRecursive(EmitRustMode_Rust, root,0);
+		if (fp) {fclose(fp);gOut=stdout;}
+	}
+	if (gOptions.emitCpp) {
+		auto fname=gOutputFilename+std::string(".cpp");
+		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
+		emitRustRecursive(EmitRustMode_CppShim, root,0);
 		if (fp) {fclose(fp);gOut=stdout;}
 	}
 	// no options given , write files..

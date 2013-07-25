@@ -12,6 +12,7 @@ TEST_CMD=./main -w testoutput -dcr $(TEST_OPTS)
 demo: main
 	$(TEST_CMD)
 	@echo output:-
+	cat testoutput.cpp
 	cat testoutput.rs
 	@echo
 	@echo "generated testoutput.rs testoutput.cpp from invocation:"

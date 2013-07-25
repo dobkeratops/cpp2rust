@@ -6,6 +6,7 @@ fn LangOf(EmitRustMode m)->EmitLang {
 	switch (m) {
 		case EmitRustMode_Rust: return EL_RUST;
 		case EmitRustMode_CppShim: return EL_CPP;
+		default: printf("%s:%d: unhandled case\n",__FILE__,__LINE__); exit(0);
 	}
 }
 
@@ -36,12 +37,18 @@ string emitRust_TypenameSub(const AstNode* n) {
 }
 */
 
-fn combinePtrInTypename(EmitLang l, const string& s, CXTypeKind tk)->string {
-	const char* ptrStr=(tk==CXType_LValueReference)?"&":"*";
-
-	switch (l) {
-		case EL_RUST: return string(ptrStr)+s;
-		case EL_CPP: return s+string(ptrStr);
+fn combinePtrInTypename(EmitLang l, const string& s, CXTypeKind tk)->string 
+{
+	// todo - handling of vector args..
+	if (l==EL_RUST || EL_CPP ) {
+		const char* ptrStr=(tk==CXType_LValueReference)?"&":"*";
+		switch (l) {
+			case EL_RUST: return string(ptrStr)+s;
+			case EL_CPP: return s+string(ptrStr);
+		}
+	} else {
+		// only one way in 'c'
+		return string("*")+s;
 	}
 }
 
@@ -183,9 +190,9 @@ fn emitRust_FunctionDecl(const AstNode&n, EmitContext depth,const char* selfType
 		EMIT_INDENT(depth,"}");
 
 	}
-
 	EMIT(";\n");
 }
+
 fn emitRust_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 	// TODO - filter and dont emit global functions that are already declared "extern "C"
 	EMIT_INDENT(depth,"extern { pub fn %s",n.cname());
@@ -296,12 +303,34 @@ fn emitRust_Enum(const AstNode& n, EmitContext depth)->void {
 	}
 	EMIT_INDENT(depth,"}\n");
 }
-
 fn emitCpp2CShim_ClassTemplate(const AstNode& n, EmitContext depth)->void {
-	EMIT("\\ %sTODO",__FUNCTION__);
+	vector<CpAstNode> methods;
+	n.filter(CXCursor_CXXMethod,methods);
+	const char* selfType = n.name.c_str();
+	EMIT("\\\\struct %s numMethods=%d\n",n.name.c_str(),methods.size());
+	
+	for (auto &m:methods) {
+		
+		EMIT_INDENT(depth,"extern \"C\" %s\t%s_%s",emit_FunctionReturnType_asStr(EL_CPP,*m).c_str(), selfType, m->cname());
+
+// todo , what to do with templates...
+//		vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
+		vector<CpAstNode> args; m->filter(CXCursor_ParmDecl, args);
+//		emitRust_GenericTypeParams(typeParams);
+//.		emitRust_FunctionArguments(*m,depth,selfType);
+		emit_FunctionArguments(EL_CPP, *m,depth,selfType);
+
+		EMIT(" {\n");
+		EMIT_INDENT(depth+1,"return self->%s(self",selfType,m->cname());
+		int	i;
+		for (i=0; i<args.size(); i++) {
+			EMIT(",%s",args[i]->cname());
+		}
+		EMIT(");\n");
+		EMIT_INDENT(depth,"};\n");
+	}
 }
-fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void
-{
+fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 
 	// filter template params...
 //	n.filter([](AstNode& n){ if (n==XCursor_TemplateT)}
@@ -495,6 +524,7 @@ fn emitRustItem(EmitRustMode m,CpAstNode n,int depth)->bool
 				emitRust_Enum(*n,depth);
 				return	 true;
 			case CXCursor_StructDecl:
+			case CXCursor_ClassDecl:
 			case CXCursor_ClassTemplate:
 				emitRust_ClassTemplate(*n,depth);
 			break;
@@ -504,14 +534,18 @@ fn emitRustItem(EmitRustMode m,CpAstNode n,int depth)->bool
 				return 	true;
 			break;
 		}
-	} else {
+	} else if (m==EmitRustMode_CppShim) {
 		switch (n->nodeKind) {
+			case CXCursor_StructDecl:
+			case CXCursor_ClassDecl:
 			case CXCursor_ClassTemplate:
 				emitCpp2CShim_ClassTemplate(*n,depth);
+				return 	true;
 			break;
 			case CXCursor_FunctionDecl:
 			case CXCursor_FunctionTemplate:
 				emitCpp2CShim_GlobalFunctionDecl(*n,depth);
+				return 	true;
 			break;
 		}
 	}
