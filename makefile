@@ -17,17 +17,29 @@ demo: main
 	@echo "generated testoutput.rs testoutput.cpp from invocation:"
 	@echo $(TEST_CMD)
 
+all: main
 
+SRC=main.cpp clanghelpers.cpp ast.cpp emitrust.cpp 
+HDR=cpp2rustcommon.h clanghelpers.h ast.h emitrust.h
 
-main: main.cpp emitrust.cpp clanghelpers.cpp ast.cpp ast.hxx ast.h
-	$(CPP) main.cpp -lclang -o ./main 
+main: $(SRC)$(HDR) ast_fn.hxx emitrust_fn.hxx AstNode.hxx clanghelpers_fn.hxx 
+	$(CPP) $(SRC) -lclang -o ./main 
 
 # TODO- rule for every _methods.h from every .cpp
+#ClassName.hxx = member function prototypes for 'classname'
+#todo-figure out script/regex to gather ClassName.hxx from *.cpp
 
-ast.hxx: ast.cpp
-	grep  "fn\s*\w*::\w\(.*\).*{" $< |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > $@
+GENERATE_METHOD_PROTOTYPES=	grep  "fn\s*\w*::\w\(.*\).*{" $< |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > $@
+GENERATE_FUNCTION_PROTOTYPES=	grep  "fn\s*\w\([^:]*\){" $< |sed 's/fn\s*\(\w*.*\){/\tfn \1;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > $@
 
-
+AstNode.hxx: ast.cpp
+	$(GENERATE_METHOD_PROTOTYPES)
+clanghelpers_fn.hxx: clanghelpers.cpp
+	$(GENERATE_FUNCTION_PROTOTYPES)
+emitrust_fn.hxx: emitrust.cpp
+	$(GENERATE_FUNCTION_PROTOTYPES)
+ast_fn.hxx : ast.cpp
+	$(GENERATE_FUNCTION_PROTOTYPES)
 
 
 info:

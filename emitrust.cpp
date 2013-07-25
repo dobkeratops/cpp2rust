@@ -1,9 +1,7 @@
+#include "emitrust.h"
+
 #define EMIT(...) fprintf(gOut, __VA_ARGS__)
 #define EMIT_INDENT(D,...) {indent(D);fprintf(gOut,__VA_ARGS__);}
-enum EmitRustMode {
-	EmitRustMode_Rust=1,
-	EmitRustMode_CppShim
-};
 fn LangOf(EmitRustMode m)->EmitLang {
 	switch (m) {
 		case EmitRustMode_Rust: return EL_RUST;
@@ -11,19 +9,19 @@ fn LangOf(EmitRustMode m)->EmitLang {
 	}
 }
 
-fn emitRustRecursive(EmitRustMode m,const AstNode& n,int depth=0)->void;
-fn emitRustItem(EmitRustMode m,const AstNode* item,int depth=0)->bool;
+fn emitRustRecursive(EmitRustMode m,const AstNode& n,EmitContext depth)->void;
+fn emitRustItem(EmitRustMode m,const AstNode* item,EmitContext depth)->bool;
 void indent(int depth) { int i; for (i=0; i<depth; i++) fprintf(gOut, "\t");}
 
 template<typename C, typename F,typename S>
-fn apply_separated( C& items, const F& main_item_function, const S& separating_function)->void {
+auto apply_separated( C& items, const F& main_item_function, const S& separating_function)->void {
 
 	for (auto&item: items) {
 		main_item_function(item);
 		if (&item!= &items.back()) separating_function(item);
 	}
 }
-fn emit_Typename(EmitLang lang, const AstNode* n,bool returnType=false)->string;
+fn emit_Typename(EmitLang lang, CpAstNode n,bool returnType=false)->string;
 fn emitRust_Typename(const AstNode* n,bool returnType=false)->string {
 	return emit_Typename(EL_RUST,n,returnType);
 }
@@ -99,7 +97,6 @@ fn emit_Typename(EmitLang lang, const AstNode* n,bool retnType)->string {
 	}
 }
 
-
 fn emitRust_GenericTypeParams(vector<CpAstNode>& typeParams)->void {
 	if (typeParams.size()) {
 		EMIT("<");
@@ -115,7 +112,7 @@ fn emitRust_GenericTypeParams(vector<CpAstNode>& typeParams)->void {
 	}
 }
 
-fn emit_FunctionArguments(EmitLang lang,const AstNode&n, int depth,const char* selfType)->void
+fn emit_FunctionArguments(EmitLang lang,const AstNode&n, EmitContext depth,const char* selfType)->void
 {
 	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
 	EMIT("(");
@@ -140,7 +137,7 @@ fn emit_FunctionArguments(EmitLang lang,const AstNode&n, int depth,const char* s
 	EMIT(")");
 }
 
-fn emitRust_FunctionArguments(const AstNode&n, int depth,const char* selfType)->void {
+fn emitRust_FunctionArguments(const AstNode&n, EmitContext depth,const char* selfType)->void {
 	return emit_FunctionArguments(EL_RUST,n, depth,selfType);
 }
 
@@ -151,7 +148,7 @@ fn emitRust_FunctionReturnType_asStr(const AstNode& n)->string{
 	return emit_Typename(EL_RUST,&n,true);
 }
 
-fn emit_CShimArgs(EmitLang lang,const AstNode& n, int depth, const char* selfType)->void {
+fn emit_CShimArgs(EmitLang lang,const AstNode& n, EmitContext depth, const char* selfType)->void {
 	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
 	EMIT("(");
 	EMIT("self%s",args.size()?",":"");
@@ -166,11 +163,11 @@ fn emit_CShimArgs(EmitLang lang,const AstNode& n, int depth, const char* selfTyp
 
 	EMIT(")");
 }
-fn emitRust_CShimArgs(const AstNode& n, int depth, const char* selfType)->void {
+fn emitRust_CShimArgs(const AstNode& n, EmitContext depth, const char* selfType)->void {
 	emit_CShimArgs(EL_RUST,n,depth,selfType);
 }
 
-fn emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType, bool emitRustToCShimCall)->void 	{
+fn emitRust_FunctionDecl(const AstNode&n, EmitContext depth,const char* selfType, bool emitRustToCShimCall)->void 	{
 	EMIT_INDENT(depth,"pub fn %s",n.cname());
 	vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
 	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
@@ -189,7 +186,7 @@ fn emitRust_FunctionDecl(const AstNode&n, int depth,const char* selfType, bool e
 
 	EMIT(";\n");
 }
-fn emitRust_GlobalFunctionDecl(const AstNode&n, int depth)->void 	{
+fn emitRust_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 	// TODO - filter and dont emit global functions that are already declared "extern "C"
 	EMIT_INDENT(depth,"extern { pub fn %s",n.cname());
 	// TODO - some instantiation of some requested types... 
@@ -204,7 +201,7 @@ fn emitRust_GlobalFunctionDecl(const AstNode&n, int depth)->void 	{
 	EMIT(";}\n");
 }
 
-fn emitCpp2CShim_GlobalFunctionDecl(const AstNode&n, int depth)->void 	{
+fn emitCpp2CShim_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 	auto rtnType=emit_FunctionReturnType_asStr(EL_CPP,n);
 	EMIT_INDENT(depth,"extern \"C\" %s %s",rtnType.c_str(), n.cname());
 	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
@@ -222,7 +219,7 @@ fn emitCpp2CShim_GlobalFunctionDecl(const AstNode&n, int depth)->void 	{
 }
 
 
-fn emitRust_Constructor(const AstNode& n, int depth, const char* selfType,bool emitCShim)->void {
+fn emitRust_Constructor(const AstNode& n, EmitContext depth, const char* selfType,bool emitCShim)->void {
 	/*
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
@@ -251,7 +248,7 @@ fn emitRust_FindDefaultConstructor(const AstNode& n)->CpAstNode {
 	return n.findFirst(CXCursor_Constructor);
 }
 
-fn emitRust_Destructor(const AstNode& n, int depth, const char* selfType, bool emitCShim)->void {
+fn emitRust_Destructor(const AstNode& n, EmitContext depth, const char* selfType, bool emitCShim)->void {
 	/*
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
@@ -263,7 +260,7 @@ fn emitRust_Destructor(const AstNode& n, int depth, const char* selfType, bool e
 }
 
 
-fn emitRust_InnerDecls(const AstNode& n, const vector<CpAstNode>& decls, int depth)->void {
+fn emitRust_InnerDecls(const AstNode& n, const vector<CpAstNode>& decls, EmitContext depth)->void {
 	EMIT_INDENT(depth,"mod %s { // inner declarations of %s\n", n.cname(),n.cname());
 	for (auto&sn: decls) {
 		emitRustItem(EmitRustMode_Rust, sn, depth+1);
@@ -272,7 +269,7 @@ fn emitRust_InnerDecls(const AstNode& n, const vector<CpAstNode>& decls, int dep
 }
 
 
-fn emitRust_Enum(const AstNode& n, int depth)->void {
+fn emitRust_Enum(const AstNode& n, EmitContext depth)->void {
 	vector<CpAstNode>	decls;
 	n.filter(CXCursor_EnumConstantDecl,decls);
 	EMIT_INDENT(depth,"enum %s {\n",n.cname());
@@ -300,10 +297,10 @@ fn emitRust_Enum(const AstNode& n, int depth)->void {
 	EMIT_INDENT(depth,"}\n");
 }
 
-fn emitCpp2CShim_ClassTemplate(const AstNode& n, int depth)->void {
+fn emitCpp2CShim_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 	EMIT("\\ %sTODO",__FUNCTION__);
 }
-fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
+fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void
 {
 
 	// filter template params...
@@ -396,8 +393,8 @@ fn emitRust_ClassTemplate(const AstNode& n, int depth)->void
 
 	if (innerDecls.size()>0)
 		emitRust_InnerDecls(n,innerDecls,depth);
-
 }
+
 using namespace std;
 template<typename KEY,typename VALUE> struct MultiMap {
 	set<KEY>	keys;
@@ -421,7 +418,7 @@ template<typename KEY,typename VALUE> struct MultiMap {
 	size_t size()const {return keyValues.size();}
 };
 
-fn emitRust_GatherFunctionsAsMethodsAndTraits(const AstNode& n,int depth)->void{
+fn emitRust_GatherFunctionsAsMethodsAndTraits(const AstNode& n,EmitContext depth)->void{
 	// Find all the functions which look like methods.
 	// i.e. first argument type is prefixed
 	// stuff them into an impl.
@@ -490,7 +487,7 @@ fn emitRust_GatherFunctionsAsMethodsAndTraits(const AstNode& n,int depth)->void{
 	#undef EMIT_TYPE
 }
 
-fn emitRustItem(EmitRustMode m,const AstNode* n,int depth)->bool
+fn emitRustItem(EmitRustMode m,CpAstNode n,int depth)->bool
 {
 	if (m==EmitRustMode_Rust) {
 		switch (n->nodeKind) {
@@ -528,8 +525,7 @@ fn emitRustItem(EmitRustMode m,const AstNode* n,int depth)->bool
 //
 //
 
-fn emitRustRecursive(EmitRustMode m,const AstNode& n,int depth)->void
-{
+fn emitRustRecursive(EmitRustMode m,const AstNode& n,EmitContext depth)->void {
 	#define EMIT_TYPE(T) \
 		case CXCursor_ ## T: emitRust_ ## T(n,depth); break;
 	bool didEmit=emitRustItem(m,&n,depth);

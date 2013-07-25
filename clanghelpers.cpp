@@ -1,3 +1,5 @@
+#include "clanghelpers.h"
+
 fn copyName(CXString src, char* dst, int maxLen)->void 
 {
 	const char* cstr=clang_getCString(src);
@@ -63,8 +65,7 @@ fn CXType_to_str(const CXType& t, EmitLang lang)->const char* {
 	#undef IMPL_TYPE
 }
 
-fn clang_getCursorName(CXCursor cu, char* dst, int maxLen)->void 
-{
+fn clang_getCursorName(CXCursor cu, char* dst, int maxLen)->void {
 	auto name=clang_getCursorSpelling(cu);
 	copyName(name, dst,maxLen);
 	clang_disposeString(name);

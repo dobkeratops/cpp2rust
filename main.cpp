@@ -1,48 +1,9 @@
-#include <iostream>
-#include <vector>
+#include "cpp2rustcommon.h"
+#include "emitrust.h"
 #include <stdio.h>
-#include <string.h>
-#include <malloc.h>
-#include <limits>
-#include <stdint.h>
-#include <clang-c/Index.h>
-#include <map>
-#include <set>
-
-//unity build
-using namespace std;
-#ifdef DEBUG
-#define ASSERT(X) if (!X) {printf("error %s:%s:\n%s\n",__FILE__,__FUNCTION__,#X)}
-
-#else
-#define ASSERT(X)
-#endif
-#define dbprintf printf
-#define fn auto
-#define let auto
-
-enum EmitLang {
-	EL_RUST,
-	EL_CPP
-};
-
-struct VisitorData {
-	int depth;
-};
-/*
-enum AstNodeId {
-	AST_UNKNOWN, AST_STRUCT,AST_FUNCTION,AST_METHOD,AST_PARAM,AST_FIELD,AST_NAMESPACE,AST_NUM
-};
-const char* g_AstNodeNames[]= {
-	"?", "struct","function","method","param","field","namespace"
-};
-*/
 
 FILE* gOut; // TODO - yuk, instead of global pass a context object.
 
-#include "clanghelpers.cpp"
-#include "ast.cpp"
-#include "emitrust.cpp"
 
 // TODO - yuk, passing a global. make an emitRust object
 
@@ -54,10 +15,10 @@ fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVis
 	clang_getCursorName(cu,elemName,256);
 
 	// create a mirror of the node in C++..
-	CXType ct=clang_getCursorType(cu);
-	CXType returnType=clang_getCursorResultType(cu);
+	auto ct=clang_getCursorType(cu);
+	auto returnType=clang_getCursorResultType(cu);
 	
-	CXString typeName=clang_getTypeKindSpelling(ct.kind);
+	auto typeName=clang_getTypeKindSpelling(ct.kind);
 	auto newNode = parentNode->createSubNode(clang_getCursorKind(cu), elemName,clang_getCString(typeName),ct,returnType);
 	clang_disposeString(typeName);
 	//newNode->cxType = clang_getCursorType(cu);
@@ -134,7 +95,7 @@ struct Options : SomeBase{
 		OPT_BAR,
 		OPT_BAZ
 	};
-	bool dumpAst, emitRust,emitCpp;
+	bool dumpAst=false, emitRust=false,emitCpp=false;
 	Options() {};
 	~Options() {};
 };
@@ -175,12 +136,12 @@ fn parseArgs(int argc, const char** argv)->int
 fn main(int argc, const char** argv)->int
 {
 	int myArgs=parseArgs(argc,argv); argc-=myArgs;argv+=myArgs;
-	CXIndex ix= clang_createIndex(0,0);
-	CXTranslationUnit tu =clang_parseTranslationUnit(ix, 0, argv, argc, 0,0, CXTranslationUnit_None);
+	auto ix= clang_createIndex(0,0);
+	auto tu =clang_parseTranslationUnit(ix, 0, argv, argc, 0,0, CXTranslationUnit_None);
 
 	for (unsigned i=0,n=clang_getNumDiagnostics(tu); i!=n; ++i) {
-		CXDiagnostic diag = clang_getDiagnostic(tu,i);
-		CXString str = clang_formatDiagnostic(diag, clang_defaultDiagnosticDisplayOptions());
+		auto diag = clang_getDiagnostic(tu,i);
+		auto str = clang_formatDiagnostic(diag, clang_defaultDiagnosticDisplayOptions());
 		fprintf(stdout, "%sn", clang_getCString(str));
 		clang_disposeString(str);
 	}
@@ -188,16 +149,16 @@ fn main(int argc, const char** argv)->int
 	clang_visitChildren(clang_getTranslationUnitCursor(tu), buildMyAstNodes, (CXClientData) &root);
 
 	if (gOptions.dumpAst) {
-		dump(root);
+		dump(root,0);
 	}
 	if (gOptions.emitCpp) {
-		auto fname=gOutputFilename+string(".cpp");
+		auto fname=gOutputFilename+std::string(".cpp");
 		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
 		emitRustRecursive(EmitRustMode_CppShim, root,0);
 		if (fp) {fclose(fp);gOut=stdout;}
 	}
 	if (gOptions.emitRust) {
-		auto fname=gOutputFilename+string(".rs");
+		auto fname=gOutputFilename+std::string(".rs");
 		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
 		emitRustRecursive(EmitRustMode_Rust, root,0);
 		if (fp) {fclose(fp);gOut=stdout;}
