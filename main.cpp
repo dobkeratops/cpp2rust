@@ -7,7 +7,31 @@ FILE* gOut; // TODO - yuk, instead of global pass a context object.
 
 // TODO - yuk, passing a global. make an emitRust object
 
+bool filterByFilename(CXCursor cu) {
+	// hardcoded to exclude anything from '/usr/include' - todo: take a list of paths to accept/ reject
+	bool ret=true;
+	CXSourceLocation srcLoc = clang_getCursorLocation(cu);
+	CXFile file;
+	clang_getSpellingLocation(srcLoc,&file,0,0,0);
+	CXString filename = clang_getFileName(file);
+	const char* szfilename=clang_getCString(filename);
+	printf("sourceloc: %s", szfilename);
+	const char* exclude_path="/usr/include";
+	if (szfilename) {
+		auto matchLen=abs(strcmp(szfilename,exclude_path));
+		ret= !(matchLen >=strlen(exclude_path));
+	}
+	clang_disposeString(filename);
+
+	return	ret;
+}
+
 fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVisitResult {
+
+	bool useThisNode = filterByFilename(cu);
+	if (!useThisNode)
+		return CXChildVisit_Continue;
+
 	auto parentNode=(AstNode*) data;
 
 	char elemName[256];
@@ -27,6 +51,8 @@ fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVis
 		// omit std namespace!
 		return CXChildVisit_Continue;
 	}
+
+	
 	switch (clang_getCursorKind(cu)) {
 	// dont handle these in out AST mirror
 //	case CXCursor_StmtExpr:

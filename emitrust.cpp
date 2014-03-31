@@ -52,6 +52,15 @@ fn combinePtrInTypename(EmitLang l, const string& s, CXTypeKind tk)->string
 	}
 }
 
+bool shouldEmitFunction(CpAstNode m) {
+	 // Dont do operators. new/delete. 
+	 // details of rust/c++ creating eachothers objects would be scary.
+	 // we just want to pass useable references across.
+	bool b= !(strcmp(m->cname(),"operator")>=8);
+	printf("should i emit %s %d\n", m->cname(),b);
+	return b;
+}
+
 fn emit_Typename(EmitLang lang, const AstNode* n,bool retnType)->string {
 
 	if(!n) {
@@ -175,6 +184,7 @@ fn emitRust_CShimArgs(const AstNode& n, EmitContext depth, const char* selfType)
 }
 
 fn emitRust_FunctionDecl(const AstNode&n, EmitContext depth,const char* selfType, bool emitRustToCShimCall)->void 	{
+	if (!shouldEmitFunction(&n)) return; 
 	EMIT_INDENT(depth,"pub fn %s",n.cname());
 	vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
 	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
@@ -196,6 +206,7 @@ fn emitRust_FunctionDecl(const AstNode&n, EmitContext depth,const char* selfType
 fn emitRust_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 	// TODO - filter and dont emit global functions that are already declared "extern "C"
 	EMIT_INDENT(depth,"extern { pub fn %s",n.cname());
+	if (!shouldEmitFunction(&n)) return;
 	// TODO - some instantiation of some requested types... 
 	// with a rule for emiting C shims with a naming scheme
 	//vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
@@ -209,6 +220,8 @@ fn emitRust_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 }
 
 fn emitCpp2CShim_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
+	if (!shouldEmitFunction(&n)) return;
+
 	auto rtnType=emit_FunctionReturnType_asStr(EL_CPP,n);
 	EMIT_INDENT(depth,"extern \"C\" %s %s",rtnType.c_str(), n.cname());
 	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
@@ -310,6 +323,7 @@ fn emitCpp2CShim_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 	EMIT("\\\\struct %s numMethods=%d\n",n.name.c_str(),methods.size());
 	
 	for (auto &m:methods) {
+		if (!shouldEmitFunction(m)) continue;
 		
 		EMIT_INDENT(depth,"extern \"C\" %s\t%s_%s",emit_FunctionReturnType_asStr(EL_CPP,*m).c_str(), selfType, m->cname());
 
@@ -320,11 +334,13 @@ fn emitCpp2CShim_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 //.		emitRust_FunctionArguments(*m,depth,selfType);
 		emit_FunctionArguments(EL_CPP, *m,depth,selfType);
 
+			
+
 		EMIT(" {\n");
-		EMIT_INDENT(depth+1,"return self->%s(self",selfType,m->cname());
+		EMIT_INDENT(depth+1,"return self->%s(",selfType,m->cname());
 		int	i;
 		for (i=0; i<args.size(); i++) {
-			EMIT(",%s",args[i]->cname());
+			EMIT((i>0)?",%s":"%s",args[i]->cname());
 		}
 		EMIT(");\n");
 		EMIT_INDENT(depth,"};\n");

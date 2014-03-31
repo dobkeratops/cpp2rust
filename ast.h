@@ -17,9 +17,11 @@ const char* g_AstNodeNames[]= {
 };
 */
 
+
 struct AstNode;
 typedef const AstNode* CpAstNode;
 struct AstNode {
+	
 //	AstNodeId	nodeType;
 	AstNode*	parent;
 	CXCursorKind	nodeKind;
