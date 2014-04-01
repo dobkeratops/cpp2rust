@@ -14,8 +14,8 @@ struct SomeBase {
     int count;
     void Foo(int x,float f);
     void Bar(const char* x);
-    int Baz2(SomeBase* a,Banana& b);
-    SomeBase Baz(vector<Banana>& b);
+    int Baz2(const SomeBase* a,const Banana& b) const;
+    SomeBase Baz(const vector<Banana>& b) const;
 };
 
 struct Options : SomeBase{
