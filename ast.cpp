@@ -1,12 +1,12 @@
 #include "ast.h"
 
-fn AstNode::filterRec( CXCursorKind k, vector<CpAstNode>& results) const->void {
-	filter(k,results);
+fn AstNode::filterByKindRec( CXCursorKind k, vector<CpAstNode>& results) const->void {
+	filterByKindRec(k,results);
 	for (auto& s:subNodes)
-		s.filterRec(k,results);
+		s.filterByKindRec(k,results);
 }
 //grr. lost default args with header-generator.
-fn AstNode::filter( CXCursorKind k, vector<CpAstNode>& results) const->void {
+fn AstNode::filterByKind( CXCursorKind k, vector<CpAstNode>& results) const->void {
 	for (auto& s:subNodes)
 		if (s.nodeKind==k)
 			results.push_back(&s);
@@ -20,12 +20,12 @@ fn AstNode::count( CXCursorKind k) const->int{
 	return num;
 }
 // TODO - depth/vs breadth
-fn AstNode::findFirst(CXCursorKind k,bool recurse) const->CpAstNode {
+fn AstNode::findFirstSub(CXCursorKind k,bool recurse) const->CpAstNode {
 	for (auto& s:subNodes) {
 		if (s.nodeKind==k)
 			return &s;
 		if (recurse){
-			auto sf=s.findFirst(k,recurse);
+			auto sf=s.findFirstSub(k,recurse);
 			if (sf)
 				return sf;
 		}
@@ -33,10 +33,10 @@ fn AstNode::findFirst(CXCursorKind k,bool recurse) const->CpAstNode {
 	return nullptr;
 }
 fn AstNode::findFirstRec(CXCursorKind k) const->CpAstNode {
-	return findFirst(k,true);
+	return findFirstSub(k,true);
 }
 fn AstNode::findFirst(CXCursorKind k) const->CpAstNode {
-	return findFirst(k,false);
+	return findFirstSub(k,false);
 }
 
 fn dump( const AstNode& node,int depth)->void {

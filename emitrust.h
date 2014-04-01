@@ -24,6 +24,13 @@ struct Emitter{
 };
 typedef int EmitContext;
 
+
+pconstchar_t FOOBARFUNCTION1(int32_t ,pair<int32_t,string>& FOOBARFUNCTION_ARG);
+class Foo {
+	void FOOBARFUNCTION2(vector<int32_t>& src);
+};
+
+
 #include "emitrust_fn.hxx"
 
 #endif /* EMITRUST_H_ */

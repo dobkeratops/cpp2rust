@@ -22,9 +22,9 @@ auto apply_separated( C& items, const F& main_item_function, const S& separating
 		if (&item!= &items.back()) separating_function(item);
 	}
 }
-fn emit_Typename(EmitLang lang, CpAstNode n,bool returnType=false)->string;
-fn emitRust_Typename(const AstNode* n,bool returnType=false)->string {
-	return emit_Typename(EL_RUST,n,returnType);
+fn emit_Typename(EmitLang lang, CpAstNode n,bool returnType, const vector<AstNode>* parent, int index)->string;
+fn emitRust_Typename(const AstNode* n,bool returnType , const vector<AstNode>* parent, int index)->string {
+	return emit_Typename(EL_RUST,n,returnType, parent,index);
 }
 /*
 string emitRust_TypenameSub(const AstNode* n) {
@@ -37,14 +37,25 @@ string emitRust_TypenameSub(const AstNode* n) {
 }
 */
 
-fn combinePtrInTypename(EmitLang l, const string& s, CXTypeKind tk)->string 
+fn combinePtrInTypename(EmitLang l, const string& s)->string 
 {
 	// todo - handling of vector args..
 	if (l==EL_RUST || EL_CPP ) {
-		const char* ptrStr=(tk==CXType_LValueReference)?"&":"*";
 		switch (l) {
-			case EL_RUST: return string(ptrStr)+s;
-			case EL_CPP: return s+string(ptrStr);
+			case EL_RUST: return string("*")+s;
+			case EL_CPP: return s+string("*");
+		}
+	} else {
+		return string("*")+s;
+	}
+}
+fn combineRefInTypename(EmitLang l, const string& s)->string 
+{
+	// todo - handling of vector args..
+	if (l==EL_RUST || EL_CPP ) {
+		switch (l) {
+			case EL_RUST: return string("&")+s;
+			case EL_CPP: return s+string("&");
 		}
 	} else {
 		// only one way in 'c'
@@ -57,11 +68,10 @@ bool shouldEmitFunction(CpAstNode m) {
 	 // details of rust/c++ creating eachothers objects would be scary.
 	 // we just want to pass useable references across.
 	bool b= !(strcmp(m->cname(),"operator")>=8);
-	printf("should i emit %s %d\n", m->cname(),b);
 	return b;
 }
 
-fn emit_Typename(EmitLang lang, const AstNode* n,bool retnType)->string {
+fn emit_Typename(EmitLang lang, const AstNode* n,bool retnType, const vector<AstNode>* parent, int thisIndex)->string {
 
 	if(!n) {
 //		printf("%x =0 first sub node passed in\n");
@@ -71,34 +81,60 @@ fn emit_Typename(EmitLang lang, const AstNode* n,bool retnType)->string {
 	static AstNode unknown(nullptr,CXCursor_UnexposedDecl,"UNKNOWN","void",CXType{CXType_Void},CXType{CXType_Void});
 	const AstNode* firstSubNode=n->subNodes.size()?&n->subNodes[0]:&unknown;
 	//todo: template
+	if (n->nodeKind==CXCursor_TemplateRef) {
+		string ret=string(n->name)+"<";
+		if (!parent) printf("error , not got parent..."); // no
+		for (size_t i=thisIndex+1; i<parent->size(); i++) {
+			ret+=emit_Typename(lang, &parent->operator[](i), false, parent, i); // TODO: this is fugly! we switch level  
+			if (i!=(parent->size()-1)) ret+=",";
+		}
+		ret+=">";
+		return ret;
+	}
 	if (n->nodeKind==CXCursor_TypeRef)
 		return string(n->name);
 	auto cxType=&n->cxType;
 	if (retnType) {
 		cxType=&n->resultType;
-		//firstSubNode=n->findFirst(CXCursor_TypeRef);
-		//if (!firstSubNode) firstSubNode==&unknown;	
+//		if (!(cxType->kind==CXType_Typedef || cxType->kind==CXType_FunctionProto || cxType->kind==CXType_FunctionNoProto)) {
+		if (cxType->kind==CXType_Pointer || cxType->kind==CXType_LValueReference || cxType->kind==CXType_RValueReference) {
+			printf("ERROR result type for %s must be a typedef/struct/enum/void/prim type etc for this tool to work\n", n->name.c_str());
+		}
+// where the hell is the return type?
+//		firstSubNode=n->findFirst(CXCursor_TypeRef);
+//		if (!firstSubNode) {
+//			firstSubNode==&unknown;
+//			cxType=&n->resultType;
+//		}
+//		else {
+//			cxType=&firstSubNode->cxType;
+//		}
 	}
 
 	switch (cxType->kind) {
 	case CXType_Invalid:
 	case CXType_Unexposed:
-		if(firstSubNode) return emit_Typename(lang,firstSubNode);
+		if(firstSubNode) return emit_Typename(lang,firstSubNode, false, &n->subNodes,0);
 		return string("INVALID");
 		break;
 	case CXType_Record:
-		return emit_Typename(lang,firstSubNode);
+		return emit_Typename(lang,firstSubNode,false, &n->subNodes,0);
 	case CXType_Pointer:
+		return combinePtrInTypename(lang,emit_Typename(lang,firstSubNode, false,&n->subNodes,0));
 	case CXType_LValueReference:
-		return combinePtrInTypename(lang,emit_Typename(lang,firstSubNode),cxType->kind);
+		return combineRefInTypename(lang,emit_Typename(lang,firstSubNode, false,&n->subNodes,0));
 	break;
 	case CXType_Typedef:
-		return emit_Typename(lang,firstSubNode);
+		return emit_Typename(lang,firstSubNode, false, &n->subNodes,0);
 	break;
+	case CXType_Enum:
+		return string(firstSubNode->name);
 	default:
 		// todo: seperate this case out
 		// template instance
-		if(firstSubNode && (firstSubNode->nodeKind==CXCursor_TemplateRef)) {
+/*		// thats not how templates work
+		if(firstSubNode && (firstSubNode->nodeKind==CXCursor_TemplateRef)) 
+		{
 			//printf("emiting template type ref %s s=%d %s %s\n",firstSubNode->name.c_str(),n->subNodes.size(),n->subNodes[0].cname(),n->subNodes[1].name.c_str());
 			string ret=string(firstSubNode->name)+"<";
 			for (size_t i=1; i<n->subNodes.size(); i++) {
@@ -109,7 +145,10 @@ fn emit_Typename(EmitLang lang, const AstNode* n,bool retnType)->string {
 			return ret;
 		}
 		else
-			return string(CXType_to_str(*cxType,lang));
+*/
+		//	auto cxType=&n->cxType;
+
+			return string(CXType_to_str(n->cxType,lang));
 	}
 }
 
@@ -130,7 +169,8 @@ fn emitRust_GenericTypeParams(vector<CpAstNode>& typeParams)->void {
 
 fn emit_FunctionArguments(EmitLang lang,const AstNode&n, EmitContext depth,const char* selfType)->void
 {
-	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
+	vector<CpAstNode> args; vector<int> arg_indices; 
+	n.filterIndexed([](CpAstNode p){return p->nodeKind==CXCursor_ParmDecl;}, args,arg_indices);
 	EMIT("(");
 	if (selfType) {
 		if (lang==EL_RUST) {
@@ -141,7 +181,7 @@ fn emit_FunctionArguments(EmitLang lang,const AstNode&n, EmitContext depth,const
 	}
 	apply_separated(args,
 		[&](CpAstNode& s) {
-			auto tn=emit_Typename(lang,s);
+			auto tn=emit_Typename(lang,s,false, &n.subNodes, arg_indices[&s- &*args.begin()]);
 			if (lang==EL_RUST) {
 				EMIT("%s:%s",s->cname(),tn.c_str());	
 			} else {
@@ -157,15 +197,15 @@ fn emitRust_FunctionArguments(const AstNode&n, EmitContext depth,const char* sel
 	return emit_FunctionArguments(EL_RUST,n, depth,selfType);
 }
 
-fn emit_FunctionReturnType_asStr(EmitLang lang, const AstNode& n)->string{
-	return emit_Typename(lang,&n,true);
+fn emit_FunctionReturnType_asStr(EmitLang lang, const AstNode& n, vector<AstNode>* parent, int index)->string{
+	return emit_Typename(lang,&n,true, parent,index);
 }
-fn emitRust_FunctionReturnType_asStr(const AstNode& n)->string{
-	return emit_Typename(EL_RUST,&n,true);
+fn emitRust_FunctionReturnType_asStr(const AstNode& n, vector<AstNode>* parent, int index)->string{
+	return emit_Typename(EL_RUST,&n,true,parent,index);
 }
 
 fn emit_CShimArgs(EmitLang lang,const AstNode& n, EmitContext depth, const char* selfType)->void {
-	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
+	vector<CpAstNode> args; n.filterByKind(CXCursor_ParmDecl, args);
 	EMIT("(");
 	EMIT("self%s",args.size()?",":"");
 	apply_separated(args,
@@ -186,11 +226,11 @@ fn emitRust_CShimArgs(const AstNode& n, EmitContext depth, const char* selfType)
 fn emitRust_FunctionDecl(const AstNode&n, EmitContext depth,const char* selfType, bool emitRustToCShimCall)->void 	{
 	if (!shouldEmitFunction(&n)) return; 
 	EMIT_INDENT(depth,"pub fn %s",n.cname());
-	vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
-	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
+	vector<CpAstNode> typeParams; n.filterByKind(CXCursor_TemplateTypeParameter, typeParams);
+	vector<CpAstNode> args; n.filterByKind(CXCursor_ParmDecl, args);
 	emitRust_GenericTypeParams(typeParams);
 	emitRust_FunctionArguments(n,depth,selfType);
-	EMIT("->%s",emitRust_FunctionReturnType_asStr(n).c_str());
+	EMIT("->%s",emitRust_FunctionReturnType_asStr(n,0,0).c_str());
 
 	if (emitRustToCShimCall && selfType) {
 		EMIT("{\n");
@@ -210,10 +250,10 @@ fn emitRust_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 	// TODO - some instantiation of some requested types... 
 	// with a rule for emiting C shims with a naming scheme
 	//vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
-	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
+	vector<CpAstNode> args; n.filterByKind(CXCursor_ParmDecl, args);
 	//emitRust_GenericTypeParams(typeParams);
 	emitRust_FunctionArguments(n,depth,nullptr);
-	EMIT("->%s",emitRust_FunctionReturnType_asStr(n).c_str());
+	EMIT("->%s",emitRust_FunctionReturnType_asStr(n,0,0).c_str());
 
 
 	EMIT(";}\n");
@@ -222,9 +262,9 @@ fn emitRust_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 fn emitCpp2CShim_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 	if (!shouldEmitFunction(&n)) return;
 
-	auto rtnType=emit_FunctionReturnType_asStr(EL_CPP,n);
+	auto rtnType=emit_FunctionReturnType_asStr(EL_CPP,n,0,0);
 	EMIT_INDENT(depth,"extern \"C\" %s %s",rtnType.c_str(), n.cname());
-	vector<CpAstNode> args; n.filter(CXCursor_ParmDecl, args);
+	vector<CpAstNode> args; n.filterByKind(CXCursor_ParmDecl, args);
 	emit_FunctionArguments(EL_CPP, n,depth,nullptr);
 	EMIT("{");
 	EMIT("return %s(",n.cname());
@@ -291,7 +331,7 @@ fn emitRust_InnerDecls(const AstNode& n, const vector<CpAstNode>& decls, EmitCon
 
 fn emitRust_Enum(const AstNode& n, EmitContext depth)->void {
 	vector<CpAstNode>	decls;
-	n.filter(CXCursor_EnumConstantDecl,decls);
+	n.filterByKind(CXCursor_EnumConstantDecl,decls);
 	EMIT_INDENT(depth,"enum %s {\n",n.cname());
 	int	i;
 	int	enumValue=0;
@@ -318,18 +358,18 @@ fn emitRust_Enum(const AstNode& n, EmitContext depth)->void {
 }
 fn emitCpp2CShim_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 	vector<CpAstNode> methods;
-	n.filter(CXCursor_CXXMethod,methods);
+	n.filterByKind(CXCursor_CXXMethod,methods);
 	const char* selfType = n.name.c_str();
-	EMIT("\\\\struct %s numMethods=%d\n",n.name.c_str(),methods.size());
+	EMIT("//struct %s numMethods=%d\n",n.name.c_str(),methods.size());
 	
 	for (auto &m:methods) {
 		if (!shouldEmitFunction(m)) continue;
 		
-		EMIT_INDENT(depth,"extern \"C\" %s\t%s_%s",emit_FunctionReturnType_asStr(EL_CPP,*m).c_str(), selfType, m->cname());
+		EMIT_INDENT(depth,"extern \"C\" %s\t%s_%s",emit_FunctionReturnType_asStr(EL_CPP,*m,0,0).c_str(), selfType, m->cname());
 
 // todo , what to do with templates...
 //		vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
-		vector<CpAstNode> args; m->filter(CXCursor_ParmDecl, args);
+		vector<CpAstNode> args; m->filterByKind(CXCursor_ParmDecl, args);
 //		emitRust_GenericTypeParams(typeParams);
 //.		emitRust_FunctionArguments(*m,depth,selfType);
 		emit_FunctionArguments(EL_CPP, *m,depth,selfType);
@@ -337,7 +377,7 @@ fn emitCpp2CShim_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 			
 
 		EMIT(" {\n");
-		EMIT_INDENT(depth+1,"return self->%s(",selfType,m->cname());
+		EMIT_INDENT(depth+1,"return self->%s(",m->cname());
 		int	i;
 		for (i=0; i<args.size(); i++) {
 			EMIT((i>0)?",%s":"%s",args[i]->cname());
@@ -351,18 +391,18 @@ fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 	// filter template params...
 //	n.filter([](AstNode& n){ if (n==XCursor_TemplateT)}
 	vector<CpAstNode> typeParams;
-	n.filter(CXCursor_TemplateTypeParameter, typeParams);
+	n.filterByKind(CXCursor_TemplateTypeParameter, typeParams);
 	vector<CpAstNode> fields;
-	n.filter(CXCursor_FieldDecl, fields);
+	n.filterByKind(CXCursor_FieldDecl, fields);
 	vector<CpAstNode> methods;
-	n.filter(CXCursor_CXXMethod, methods);
+	n.filterByKind(CXCursor_CXXMethod, methods);
 	vector<CpAstNode> innerDecls;
 
-	n.filter(CXCursor_StructDecl, innerDecls);
-	n.filter(CXCursor_ClassDecl, innerDecls);
-	n.filter(CXCursor_ClassTemplate, innerDecls);
-	n.filter(CXCursor_EnumDecl, innerDecls);
-	n.filter(CXCursor_TypedefDecl, innerDecls);
+	n.filterByKind(CXCursor_StructDecl, innerDecls);
+	n.filterByKind(CXCursor_ClassDecl, innerDecls);
+	n.filterByKind(CXCursor_ClassTemplate, innerDecls);
+	n.filterByKind(CXCursor_EnumDecl, innerDecls);
+	n.filterByKind(CXCursor_TypedefDecl, innerDecls);
 
 	auto base = n.findFirst(CXCursor_CXXBaseSpecifier);
 
@@ -389,7 +429,7 @@ fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 		apply_separated(fields,
 			[&](CpAstNode& s) {
 				EMIT_INDENT(depth+1,"%s:", s->cname());
-				EMIT("%s",emitRust_Typename(s).c_str());
+				EMIT("%s",emitRust_Typename(s,false, 0,0).c_str());
 			},
 			[](CpAstNode& s) {
 				EMIT(",\n");
@@ -425,7 +465,7 @@ fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 		for (auto &m:methods) {	
 			EMIT_INDENT(depth,"extern{ fn %s_%s",n.cname(),m->cname());
 			emitRust_FunctionArguments(*m,depth,n.cname());
-			EMIT("->%s;",emitRust_FunctionReturnType_asStr(*m).c_str());
+			EMIT("->%s;",emitRust_FunctionReturnType_asStr(*m,0,0).c_str());
 			EMIT("}\n");
 		}
 	}
@@ -484,7 +524,7 @@ fn emitRust_GatherFunctionsAsMethodsAndTraits(const AstNode& n,EmitContext depth
 		auto functionNode=&sn;
 
 		functionsByName.insert(functionNode->name,functionNode);
-		auto type=emitRust_Typename(firstParam);
+		auto type=emitRust_Typename(firstParam,false,0,0);
 		const char* typeName=type.c_str();
 		if (typeName[0]=='*'||typeName[0]=='&')typeName++;
 
@@ -560,7 +600,9 @@ fn emitRustItem(EmitRustMode m,CpAstNode n,int depth)->bool
 			break;
 			case CXCursor_FunctionDecl:
 			case CXCursor_FunctionTemplate:
-				emitCpp2CShim_GlobalFunctionDecl(*n,depth);
+				// no need for rust shims for global functions.
+				// .. because we manually make these extern "C"?
+//				emitCpp2CShim_GlobalFunctionDecl(*n,depth);
 				return 	true;
 			break;
 		}

@@ -25,6 +25,9 @@ HDR=cpp2rustcommon.h clanghelpers.h ast.h emitrust.h
 
 main: $(SRC)$(HDR) ast_fn.hxx emitrust_fn.hxx AstNode.hxx clanghelpers_fn.hxx 
 	$(CPP) $(SRC) -lclang -o ./main 
+	
+testoutput: test_testoutput.cpp demo
+	$(CPP) $< -lclang -o ./trash -Wno-return-type
 
 # TODO- rule for every _methods.h from every .cpp
 #ClassName.hxx = member function prototypes for 'classname'

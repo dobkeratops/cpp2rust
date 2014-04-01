@@ -15,17 +15,19 @@ bool filterByFilename(CXCursor cu) {
 	clang_getSpellingLocation(srcLoc,&file,0,0,0);
 	CXString filename = clang_getFileName(file);
 	const char* szfilename=clang_getCString(filename);
-	printf("sourceloc: %s", szfilename);
 	const char* exclude_path="/usr/include";
 	if (szfilename) {
-		auto matchLen=abs(strcmp(szfilename,exclude_path));
-		ret= !(matchLen >=strlen(exclude_path));
+		const char* s1=szfilename,*s2=exclude_path;
+		while (*s1 && *s2) { if (*s1!=*s2) break; s1++,s2++; }
+		if (!*s2) ret=false;
+		if (!ret) {printf("filtered out %s\n", szfilename);}
 	}
 	clang_disposeString(filename);
 
 	return	ret;
 }
 
+static int g_dbg_watch=0;
 fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVisitResult {
 
 	bool useThisNode = filterByFilename(cu);
@@ -41,19 +43,32 @@ fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVis
 	// create a mirror of the node in C++..
 	auto ct=clang_getCursorType(cu);
 	auto returnType=clang_getCursorResultType(cu);
-	
+
 	auto typeName=clang_getTypeKindSpelling(ct.kind);
-	auto newNode = parentNode->createSubNode(clang_getCursorKind(cu), elemName,clang_getCString(typeName),ct,returnType);
-	clang_disposeString(typeName);
-	//newNode->cxType = clang_getCursorType(cu);
 	if ((!strcmp(elemName,"std") || (elemName[0]=='_' && elemName[1]=='_'))&& clang_getCursorKind(cu)==CXCursor_Namespace) 
 	{	
 		// omit std namespace!
 		return CXChildVisit_Continue;
 	}
-
 	
-	switch (clang_getCursorKind(cu)) {
+	auto newNode = parentNode->createSubNode(clang_getCursorKind(cu), elemName,clang_getCString(typeName),ct,returnType);
+	clang_disposeString(typeName);
+	//newNode->cxType = clang_getCursorType(cu);
+	
+	
+
+
+	auto ck=clang_getCursorKind(cu);
+	/*
+	if (CXCursor_TemplateRef) {
+		g_dbg_watch=4;	
+	}
+	if (g_dbg_watch>=0) {
+		printf("following template %d \n", ck);
+	}
+	*/
+
+	switch (ck) {
 	// dont handle these in out AST mirror
 //	case CXCursor_StmtExpr:
 //	case CXCursor_CompoundStmt:
@@ -61,6 +76,7 @@ fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVis
 //	default:
 		break;
 	// definitely handle these
+	case CXCursor_CXXTypeidExpr:
 	case CXCursor_StructDecl:
 	case CXCursor_ClassDecl:
 	case CXCursor_UnionDecl:
@@ -73,13 +89,15 @@ fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVis
 	case CXCursor_Constructor:
 	case CXCursor_Destructor:
 	case CXCursor_TemplateTypeParameter:
+	case CXCursor_NonTypeTemplateParameter:
+	case CXCursor_TemplateTemplateParameter:
 	case CXCursor_TemplateRef:
+	case CXCursor_FunctionTemplate:
 	case CXCursor_ClassTemplate:
 	case CXCursor_UsingDirective:
 	case CXCursor_UsingDeclaration:
 	case CXCursor_TypeRef:
 	case CXCursor_CallExpr:
-	case CXCursor_FunctionTemplate:
 	case CXCursor_EnumDecl:
 	case CXCursor_EnumConstantDecl:
 	case CXCursor_TypeAliasDecl:
@@ -93,14 +111,19 @@ fn buildMyAstNodes(CXCursor cu, CXCursor parent,  CXClientData data)->CXChildVis
 	case CXCursor_CharacterLiteral:
 
 	case CXCursor_DeclRefExpr:
+		clang_visitChildren(cu, buildMyAstNodes, (CXClientData*) newNode);
+	break;
 default:
+		//printf("Unhandled Cursor Kind: %d %s  ",ck, elemName);
+
 	// todo - extract return type? how? it doesn't seem to be there
 		clang_visitChildren(cu, buildMyAstNodes, (CXClientData*) newNode);
 	break;
-		break;
+		
 	}
 //	printf("num args=%d\n", clang_getCursorNumArgs(cu));
 	//printf("cursor data %x\n",data);
+//	return CXChildVisit_Recurse;
 	return CXChildVisit_Continue;
 }
 
@@ -204,3 +227,5 @@ fn main(int argc, const char** argv)->int
 
 	return 0;
 }
+
+
