@@ -26,7 +26,7 @@ typedef int EmitContext;
 
 
 pconstchar_t FOOBARFUNCTION1(int32_t ,pair<int32_t,string>& FOOBARFUNCTION_ARG);
-class Foo {
+struct Foo {
 	void FOOBARFUNCTION2(vector<int32_t>& src);
 };
 

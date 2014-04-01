@@ -1,5 +1,6 @@
 #include "cpp2rustcommon.h"
 #include "emitrust.h"
+#include "testinput.h"
 #include <stdio.h>
 
 FILE* gOut; // TODO - yuk, instead of global pass a context object.
@@ -131,38 +132,8 @@ fn testVisit(CXTranslationUnit tu)->void {
 	
 }
 
-struct Banana{
-	int x,y,z;
-};
-
-struct SomeBase {
-	int count;
-	void Foo(int x,float f);
-	void Bar(const char* x);
-	int Baz(SomeBase* a,Banana& b);
-	SomeBase Baz(vector<Banana>& b);
-};
-
-struct Options : SomeBase{
-	struct Option_s {
-		int x,y;
-	};
-	enum OptionStuff {
-		OPT_FOO,
-		OPT_BAR,
-		OPT_BAZ
-	};
-	bool dumpAst=false, emitRust=false,emitCpp=false;
-	Options() {};
-	~Options() {};
-};
-
 Options gOptions;
 
-template<typename T>
-struct Vector {
-	T* first,*last,*capacity;
-};
 string gOutputFilename("cpp2rust_output");
 fn parseArgs(int argc, const char** argv)->int 
 {

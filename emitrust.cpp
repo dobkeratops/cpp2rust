@@ -22,10 +22,12 @@ auto apply_separated( C& items, const F& main_item_function, const S& separating
 		if (&item!= &items.back()) separating_function(item);
 	}
 }
+/*
 fn emit_Typename(EmitLang lang, CpAstNode n,bool returnType, const vector<AstNode>* parent, int index)->string;
 fn emitRust_Typename(const AstNode* n,bool returnType , const vector<AstNode>* parent, int index)->string {
 	return emit_Typename(EL_RUST,n,returnType, parent,index);
 }
+*/
 /*
 string emitRust_TypenameSub(const AstNode* n) {
 	switch (n->nodeKind) {
@@ -121,8 +123,8 @@ auto emit_CXType(enum EmitLang lang, CXType cxType)->string {
         case CXType_Invalid: //get from the node, but we dont understand why :(//string("CXTY_INVALID");
         case CXType_Unexposed: //get from the node, but we dont understand why we ever get this :(//string("CXTY_UNEXPOSED");
         case CXType_Enum:
-        case CXType_Typedef:
         case CXType_Record:
+            //str.append("RECORD=");
             str+=emit_CXTypeDecl(lang,c);//get from the node, but we dont understand why :(
             break;
         case CXType_Pointer:{
@@ -134,8 +136,15 @@ auto emit_CXType(enum EmitLang lang, CXType cxType)->string {
         case CXType_LValueReference:
             str+= combineRefInTypename(lang, emit_CXType(lang, clang_getPointeeType(cxType)));
         break;
+
+        case CXType_Typedef:
+            //str.append("TYPDEF=");
+            str+=emit_CXTypeDecl(lang,c); // hmm, but we *can* have template params on typedefs :(
+            //str.append(CXType_to_str(cxType,lang));//emit_CXTypeDecl(lang, c);
+            return str; // no template params.
+        break;
+
         default:
-            //str+=emit_CXTypeDecl(lang, c);
             str.append(CXType_to_str(cxType,lang));//emit_CXTypeDecl(lang, c);
     }
 
@@ -151,18 +160,17 @@ auto emit_CXType(enum EmitLang lang, CXType cxType)->string {
         str+=">";
     }
     return str;
-
 }
-
+/*
 auto emit_Typename(EmitLang lang, const AstNode* n,bool retnType, const vector<AstNode>* parent, int thisIndex)->string {
 
-	auto cxType=&n->cxType;
-	if (retnType) {
-		cxType=&n->resultType;
+    auto cxType=&n->cxType;
+    if (retnType) {
+        cxType=&n->resultType;
     }
     return emit_CXType(lang, *cxType);
-
 }
+*/
 
 fn emitRust_GenericTypeParams(vector<CpAstNode>& typeParams)->void {
 	if (typeParams.size()) {
@@ -193,7 +201,7 @@ fn emit_FunctionArguments(EmitLang lang,const AstNode&n, EmitContext depth,const
 	}
 	apply_separated(args,
 		[&](CpAstNode& s) {
-			auto tn=emit_Typename(lang,s,false, &n.subNodes, arg_indices[&s- &*args.begin()]);
+            auto tn=emit_CXType(lang, s->cxType);
 			if (lang==EL_RUST) {
 				EMIT("%s:%s",s->cname(),tn.c_str());	
 			} else {
@@ -210,10 +218,10 @@ fn emitRust_FunctionArguments(const AstNode&n, EmitContext depth,const char* sel
 }
 
 fn emit_FunctionReturnType_asStr(EmitLang lang, const AstNode& n, vector<AstNode>* parent, int index)->string{
-	return emit_Typename(lang,&n,true, parent,index);
+    return emit_CXType(lang,n.resultType);
 }
 fn emitRust_FunctionReturnType_asStr(const AstNode& n, vector<AstNode>* parent, int index)->string{
-	return emit_Typename(EL_RUST,&n,true,parent,index);
+    return emit_CXType(EL_RUST,n.resultType);
 }
 
 fn emit_CShimArgs(EmitLang lang,const AstNode& n, EmitContext depth, const char* selfType)->void {
@@ -441,7 +449,7 @@ fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 		apply_separated(fields,
 			[&](CpAstNode& s) {
 				EMIT_INDENT(depth+1,"%s:", s->cname());
-				EMIT("%s",emitRust_Typename(s,false, 0,0).c_str());
+                EMIT("%s",emit_CXType(EL_RUST, s->cxType).c_str());
 			},
 			[](CpAstNode& s) {
 				EMIT(",\n");
@@ -536,7 +544,7 @@ fn emitRust_GatherFunctionsAsMethodsAndTraits(const AstNode& n,EmitContext depth
 		auto functionNode=&sn;
 
 		functionsByName.insert(functionNode->name,functionNode);
-		auto type=emitRust_Typename(firstParam,false,0,0);
+        auto type=emit_CXType(EL_RUST,firstParam->cxType);
 		const char* typeName=type.c_str();
 		if (typeName[0]=='*'||typeName[0]=='&')typeName++;
 
