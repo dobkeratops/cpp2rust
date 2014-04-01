@@ -1,4 +1,4 @@
-LIBS=-L$(LLVM)/Debug+Asserts/lib
+LIBS=-L$(LLVM)/Release/lib
 INC=-I$(LLVM)/tools/clang/include -I$(LLVM)/include
 CC=clang  $(LIBS) $(INC)  
 
@@ -10,6 +10,7 @@ CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC)
 TEST_CMD=./main -w testoutput -dcr $(TEST_OPTS)
 
 demo: main
+	echo  $(LLVM)
 	$(TEST_CMD)
 	@echo output:-
 	cat testoutput.cpp
@@ -20,11 +21,13 @@ demo: main
 
 all: main
 
+# clang++ main.cpp clanghelpers.cpp ast.cpp emitrust.cpp -L  -lclang
+
 SRC=main.cpp clanghelpers.cpp ast.cpp emitrust.cpp 
 HDR=cpp2rustcommon.h clanghelpers.h ast.h emitrust.h
 
 main: $(SRC)$(HDR) ast_fn.hxx emitrust_fn.hxx AstNode.hxx clanghelpers_fn.hxx 
-	$(CPP) $(SRC) -lclang -o ./main 
+	$(CPP) $(SRC) $(LIBS) -lclang -o ./main 
 	
 testoutput: test_testoutput.cpp demo
 	$(CPP) $< -lclang -o ./trash -Wno-return-type

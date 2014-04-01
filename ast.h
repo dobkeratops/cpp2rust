@@ -37,8 +37,11 @@ struct AstNode {
 		this->parent=parentNode;
 		this->nodeKind=k; this->name=n; this->typeName=tn; this->cxType=cxt; this->resultType=returnType;
 	}
+	string getName() { return this->name;}
+	string& getNameRef() { return this->name;}
+	pair<string,int32_t> getFoo() { return make_pair(this->name,2);}
 
-	PAstNode	createSubNode(CXCursorKind k, const char* name, const char* typeName, CXType cxt, CXType result) {
+	AstNode*	createSubNode(CXCursorKind k, const char* name, const char* typeName, CXType cxt, CXType result) {
 		this->subNodes.emplace_back(this,k,name,typeName,cxt,result);
 		return (AstNode*)&(this->subNodes.back());
 	}

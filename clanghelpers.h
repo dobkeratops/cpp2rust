@@ -18,7 +18,7 @@ enum EmitLang {
 // requires 'fn macro' and 1 line "fn name..->{" to auto-generate
 typedef const char *pconstchar_t;
 typedef const CXType& CrCXType;
-fn CXType_to_str(CrCXType t, EmitLang lang)->pconstchar_t ;
+fn CXType_to_str(CrCXType t, EmitLang lang)->const char* ;
 fn copyName(CXString src, char* dst, int maxLen)->void;
 fn clang_getCursorName(CXCursor cu, char* dst, int maxLen)->void;
 fn CXCursorKind_to_str(CXCursorKind k)->pconstchar_t;
