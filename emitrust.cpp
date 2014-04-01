@@ -69,136 +69,99 @@ string emit_CXTypeDecl(enum EmitLang lang, CXCursor c) {
 	CXString name=clang_getCursorSpelling(c);
 	string str(clang_getCString(name));
 	clang_disposeString(name);
+
 	return str;
 }
 
 // todo - how to handle the mutability swizzle ?
 // absence of const modifier requires mut. const modifier is to be ignored.
 auto emit_CXType(enum EmitLang lang, CXType cxType)->string {
-    string r;
+    string str;
+
     bool immutable = clang_isConstQualifiedType(cxType);
 
+    // todo: wrap immutability as a call, it might be post/prefix in other syntax?
     if ( lang==EL_RUST && !immutable) {
-        r+="mut ";
+        str+="mut ";
     } else if (immutable) {
-        r+="const " ;
+        str+="const " ;
     }
 
 	CXCursor c=clang_getTypeDeclaration(cxType);
-    r+= emit_CXTypeDecl(lang,c);
-	//clang_disposeCXCursor(c);
-	return r;
-/*
-	switch (cxType->kind) {
-		default:
-//	return string(CXType_to_str(cxType,lang));
-			{
-				CXString cxstr = clang_getTypeSpelling(*cxType);
-				string str(clang_getCString(cxstr));
-				clang_disposeString(cxstr);
-			}
-	}
-*/
-}
 
-auto emit_Typename(EmitLang lang, const AstNode* n,bool retnType, const vector<AstNode>* parent, int thisIndex)->string {
-
-	if(!n) {
-//		printf("%x =0 first sub node passed in\n");
-//		exit(0);
-		return string("UNKNOWN_TYPE");
-	}
-	static AstNode unknown(nullptr,CXCursor_UnexposedDecl,"UNKNOWN","void",CXType{CXType_Void},CXType{CXType_Void});
-	const AstNode* firstSubNode=n->subNodes.size()?&n->subNodes[0]:&unknown;
-	//todo: template
-/*	if (n->nodeKind==CXCursor_TemplateRef) {
-		string ret=string(n->name)+"<";
-		if (!parent) printf("error , not got parent..."); // no
-		for (size_t i=thisIndex+1; i<parent->size(); i++) {
-			char tmp[256]; sprintf(tmp,"%d",parent->operator[](i).nodeKind);
-			ret+=string(tmp);//string("%d");parent->operator[](i).nodeKind
-			ret+=emit_Typename(lang, &parent->operator[](i), false, parent, i); // TODO: this is fugly! we switch level  
-			if (i!=(parent->size()-1)) ret+=",";
-		}
-		ret+=">";
-		return ret;
-	}
+    switch (cxType.kind) {
+/*        case CXType_Void:   str.append("void"); break
+        case CXType_Bool:   str.append("Void"); break
+        case CXType_Char_U = 4,
+        case CXType_UChar = 5,
+        case CXType_Char16 = 6,
+        case CXType_Char32 = 7,
+        case CXType_UShort = 8,
+        case CXType_UInt = 9,
+        case CXType_ULong = 10,
+        case CXType_ULongLong = 11,
+        case CXType_UInt128 = 12,
+        case CXType_Char_S = 13,
+        case CXType_SChar = 14,
+        case CXType_WChar = 15,
+        case CXType_Short = 16,
+        case CXType_Int = 17,
+        case CXType_Long = 18,
+        case CXType_LongLong = 19,
+        case CXType_Int128 = 20,
+        case CXType_Float = 21,
+        case CXType_Double = 22,
+        case CXType_LongDouble = 23,
+        case CXType_NullPtr = 24,
+        case CXType_Overload = 25,
+        case CXType_Dependent = 26,
+        case CXType_ObjCId = 27,
 */
-	if (n->nodeKind==CXCursor_TypeRef)
-		return string(n->name);
-	auto cxType=&n->cxType;
-	if (retnType) {
-		cxType=&n->resultType;
-//		if (!(cxType->kind==CXType_Typedef || cxType->kind==CXType_FunctionProto || cxType->kind==CXType_FunctionNoProto)) {
-// where the hell is the return type?
-//		firstSubNode=n->findFirst(CXCursor_TypeRef);
-//		if (!firstSubNode) {
-//			firstSubNode==&unknown;
-//			cxType=&n->resultType;
-//		}
-//		else {
-//			cxType=&firstSubNode->cxType;
-//		}
-	}
-    // TODO: this whole block from here on is actually 'emit_CXType(..')
-	string str;
-	switch (cxType->kind) {
-	case CXType_Invalid:
-	case CXType_Unexposed:
-		if(firstSubNode) return emit_Typename(lang,firstSubNode, false, &n->subNodes,0);
-		return string("INVALID");
-		break;
-	case CXType_Record:
-		str= emit_Typename(lang,firstSubNode,false, &n->subNodes,0);
-		break;
-	case CXType_Pointer:
-//		return combinePtrInTypename(lang,emit_Typename(lang,firstSubNode, false,&n->subNodes,0));
-		str= combinePtrInTypename(lang, emit_CXType(lang, clang_getPointeeType(*cxType)));
-		break;
-	case CXType_RValueReference:
-	case CXType_LValueReference:
-//		return combineRefInTypename(lang,emit_Typename(lang,firstSubNode, false,&n->subNodes,0));
-		str= combineRefInTypename(lang, emit_CXType(lang, clang_getPointeeType(*cxType)));
-	break;
-	case CXType_Typedef:
-        str= emit_Typename(lang,firstSubNode, false, &n->subNodes,0);
-	break;
-	case CXType_Enum:
-        str= string(firstSubNode->name); // no, its from the cursor
-	default:
-		// todo: seperate this case out
-		// template instance
-/*		// thats not how templates work
-		if(firstSubNode && (firstSubNode->nodeKind==CXCursor_TemplateRef)) 
-		{
-			//printf("emiting template type ref %s s=%d %s %s\n",firstSubNode->name.c_str(),n->subNodes.size(),n->subNodes[0].cname(),n->subNodes[1].name.c_str());
-			string ret=string(firstSubNode->name)+"<";
-			for (size_t i=1; i<n->subNodes.size(); i++) {
-				ret+=emit_Typename(lang,&n->subNodes[i]);
-				if (i!=n->subNodes.size()-1) ret+=",";
-			}
-			ret+=">";
-			return ret;
-		}
-		else
-*/
-		//	auto cxType=&n->cxType;
 
-			str= string(CXType_to_str(n->cxType,lang));
-	}
+        case CXType_Invalid: //get from the node, but we dont understand why :(//string("CXTY_INVALID");
+        case CXType_Unexposed: //get from the node, but we dont understand why we ever get this :(//string("CXTY_UNEXPOSED");
+        case CXType_Enum:
+        case CXType_Typedef:
+        case CXType_Record:
+            str+=emit_CXTypeDecl(lang,c);//get from the node, but we dont understand why :(
+            break;
+        case CXType_Pointer:{
+            auto pointee=clang_getPointeeType(cxType);
+            str+= combinePtrInTypename(lang, emit_CXType(lang, pointee));
+            break;
+        }
+        case CXType_RValueReference:
+        case CXType_LValueReference:
+            str+= combineRefInTypename(lang, emit_CXType(lang, clang_getPointeeType(cxType)));
+        break;
+        default:
+            //str+=emit_CXTypeDecl(lang, c);
+            str.append(CXType_to_str(cxType,lang));//emit_CXTypeDecl(lang, c);
+    }
 
     // todo: with this propper handling of template args and so on... we can eliminate all the first|SubNodes junk
-	int numtyargs=clang_Type_getNumTemplateArguments(*cxType);
+    signed int numtyargs=clang_Type_getNumTemplateArguments(cxType);    //clang says  -1 = no template args.
     if (numtyargs>=0) {
         str+="<";
         for (int i=0; i<numtyargs; i++) {
-            if (i) str+=",";
-            auto ty=clang_Type_getTemplateArgumentAsType(*cxType, i);
+            if (i>0) str+=",";
+            auto ty=clang_Type_getTemplateArgumentAsType(cxType, i);
             str +=emit_CXType(lang, ty);
         }
         str+=">";
     }
-	return str;
+    return str;
+
+}
+
+auto emit_Typename(EmitLang lang, const AstNode* n,bool retnType, const vector<AstNode>* parent, int thisIndex)->string {
+
+	auto cxType=&n->cxType;
+	if (retnType) {
+		cxType=&n->resultType;
+    }
+    return emit_CXType(lang, *cxType);
+
 }
 
 fn emitRust_GenericTypeParams(vector<CpAstNode>& typeParams)->void {
