@@ -93,7 +93,7 @@ string emit_CXTypeDecl(enum EmitLang lang, CXCursor c) {
 //	if (strcmp(str.c_str(), "struct")>=strlen("struct")) {
 	if (str.length()>=strlen("struct") && str[0]=='s' && str[1]=='t' && str[2]=='r' && str[3]=='u' && str[4]=='c'  && str[5]=='t') {
 		printf("got struct in name, %s\n", str.c_str());
-		exit(0);
+//		exit(0);
 	}
 	clang_disposeString(name);
 
@@ -393,7 +393,8 @@ fn emitRust_Destructor(const AstNode& n, EmitContext depth, const char* selfType
 
 
 fn emitRust_InnerDecls(const AstNode& n, const vector<CpAstNode>& decls, EmitContext depth)->void {
-	EMIT_INDENT(depth,"mod %s { // inner declarations of %s\n", n.cname(),n.cname());
+	EMIT_INDENT(depth,"pub mod %s { // inner declarations of %s\n", n.cname(),n.cname());
+	emitRustModPrefix(n,depth+1);
 	for (auto&sn: decls) {
 		emitRustItem(EmitRustMode_Rust, sn, depth+1);
 	}
@@ -405,7 +406,7 @@ fn emitRust_Enum(const AstNode& n, EmitContext depth)->void {
 	if (!strlen(n.cname())) { printf("error trying to emit anon enum?!\n"); return; }
 	vector<CpAstNode>	decls;
 	n.filterByKind(CXCursor_EnumConstantDecl,decls);
-	EMIT_INDENT(depth,"enum %s {\n",n.cname());
+	EMIT_INDENT(depth,"pub enum %s {\n",n.cname());
 	int	i;
 	int	enumValue=0;
 	for (i=0; i<decls.size(); i++) {
@@ -478,7 +479,11 @@ fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 	n.filterByKind(CXCursor_ClassTemplate, innerDecls);
 	n.filterByKind(CXCursor_EnumDecl, innerDecls);
 	n.filterByKind(CXCursor_TypedefDecl, innerDecls);
-
+/*	if (!(fields.size() || methods.size() || innerDecls.size())) {
+		printf("anon struct, r.e. unhandled duplicate/forward decl??");
+		return;
+	}
+*/
 	auto base = n.findFirst(CXCursor_CXXBaseSpecifier);
 
 	auto dtr=n.findFirst(CXCursor_Destructor);
@@ -492,7 +497,7 @@ fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 	// ..otherwise if its a collection of functions/types it's really trait?
 
 	// other metadata for binding ?
-	EMIT_INDENT(depth,"struct\t%s", n.cname());
+	EMIT_INDENT(depth,"pub struct\t%s", n.cname());
 	emitRust_GenericTypeParams(typeParams);
 
 	if (!fields.size()) { EMIT(";\n");}
@@ -533,14 +538,14 @@ fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 		}
 		EMIT_INDENT(depth,"}\n");
 		if (ctr) {
-			EMIT_INDENT(depth,"extern{ fn new_%s",n.cname());
+			EMIT_INDENT(depth,"extern{ pub fn new_%s",n.cname());
             //auto selfCXType = m.cxType; // not sure, does this get our const qualifier?
             emitRust_FunctionArguments(*ctr,depth,true, nullptr, false);
 			EMIT("->*%s;}\n",n.cname(),n.cname(),n.cname());
 		}
 		// emit C shim prototypes..
 		for (auto &m:methods) {	
-			EMIT_INDENT(depth,"extern{ fn %s_%s",n.cname(),m->cname());
+			EMIT_INDENT(depth,"extern{ pub fn %s_%s",n.cname(),m->cname());
             emitRust_FunctionArguments(*m,depth,false, n.cname(),false);
 			EMIT("->%s;",emitRust_FunctionReturnType_asStr(*m,0,0).c_str());
 			EMIT("}\n");
@@ -651,8 +656,27 @@ fn emitRust_GatherFunctionsAsMethodsAndTraits(const AstNode& n,EmitContext depth
 
 fn emitRustItem(EmitRustMode m,CpAstNode n,int depth)->bool
 {
+	static set<string> emitted_names;
+
 	if (m==EmitRustMode_Rust) {
+		if (emitted_names.count(n->name)>0) {
+			printf("error duplicate emission, will fail if we had forward decls?!");
+			return true;
+		}
+		emitted_names.insert(n->name);
 		switch (n->nodeKind) {
+			case CXCursor_TypedefDecl:  {
+				if (n->subNodes.size()>0) {
+					printf("TYPEDEF %s %s{%s}\n", n->name.c_str(), 
+					   CXCursorKind_to_str(n->subNodes[0].nodeKind), 
+						n->subNodes[0].name.c_str() ); 
+//					exit(0);
+				} else {
+					printf("TYPEDEF %s %s %s \n" ,n->name.c_str(), n->typeName.c_str(), CXType_to_str(n->cxType,EL_RUST));
+//					exit(0);
+				}
+				return true;
+			} 
 			case CXCursor_EnumDecl:
 				emitRust_Enum(*n,depth);
 				return	 true;
@@ -705,4 +729,32 @@ fn emitRustRecursive(EmitRustMode m,const AstNode& n,EmitContext depth)->void {
 	}
 	emitRust_GatherFunctionsAsMethodsAndTraits(n,depth);
 }
+fn emitRustModPrefix(const AstNode& n,EmitContext depth)->void {
+	// todo, indent ..
+	EMIT("use std::libc::{c_void, c_char,c_uchar, c_short,c_ushort,c_long,c_ulong,c_int, c_float,c_double,c_longlong };\n");
+	EMIT("use super::*;\n");
+}
+
+fn emitRustPrefix(const AstNode& n,EmitContext depth)->void {
+	EMIT("#[feature(globs)];\n");
+	EMIT("#[allow(non_camel_case_types)];\n");
+	EMIT("#[allow(unused_imports)];\n");
+	EMIT("#[allow(unused_variable)];\n");
+
+	emitRustModPrefix(n,depth);
+	EMIT("pub type c_bool=c_int;\n");
+	EMIT("pub type int16_t = i16;\n");
+	EMIT("pub type int32_t = i32;\n");
+	EMIT("pub type int64_t = i64;\n");
+	EMIT("pub type uint16_t = u16;\n");
+	EMIT("pub type uint32_t = u32;\n");
+	EMIT("pub type uint64_t = u64;\n");
+	EMIT("pub type FILE=*c_void;\n");
+	EMIT("pub type pconstchar_t=*c_char;\n");
+	EMIT("pub struct vector<T> { pub begin:*T, pub end:*T, pub capacity:*T}\n");
+	EMIT("pub struct pair<A,B> { pub first:A, pub second:B}\n");
+	EMIT("pub struct string { pub data:*c_char }\n");
+	// other prefix for the whole file. eg: counting the forward decls?
+}
+
 #undef EMIT

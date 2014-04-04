@@ -182,6 +182,7 @@ fn main(int argc, const char** argv)->int
 	if (gOptions.emitRust) {
 		auto fname=gOutputFilename+std::string(".rs");
 		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
+		emitRustPrefix(root,0);
 		emitRustRecursive(EmitRustMode_Rust, root,0);
 		if (fp) {fclose(fp);gOut=stdout;}
 	}
