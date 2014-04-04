@@ -17,10 +17,11 @@
 //unity build
 using namespace std;
 #ifdef DEBUG
-#define ASSERT(X) if (!X) {printf("error %s:%s:\n%s\n",__FILE__,__FUNCTION__,#X)}
-
+#define ASSERT(X) if (!(X)) {printf("error %s:%s:\n%s\n",__FILE__,__FUNCTION__,#X);}
+#define TRACE(X) printf("%s:%d: %s() %s=",__FILE__,__LINE__,__FUNCTION__, #X);cout<<(X)<<"\n";
 #else
 #define ASSERT(X)
+#define TRACE(X)
 #endif
 #define dbprintf printf
 #define fn auto

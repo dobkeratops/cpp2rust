@@ -68,14 +68,33 @@ struct AstNode {
 		for(auto& s:subNodes)
 			if (s.nodeKind==k)
 				return &s;
+		return nullptr;
+	}
+	template<typename F>
+	fn filter(F& f,vector<const AstNode*>& results) ->void {
+		for (auto& s:subNodes)
+			if (f(s)) results.push_back(&s);
 	}
 	template<typename F>
 	fn filter(F& f,vector<const AstNode*>& results) const->void {
 		for (auto& s:subNodes)
 			if (f(s)) results.push_back(&s);
 	}
-	fn filterByKind( CXCursorKind k, vector<CpAstNode>& results) const->void;
+	template<typename T>
+	fn filterByKind( CXCursorKind k, vector<T>& results)->void {
+		for (auto& s:subNodes)
+			if (s.nodeKind==k)
+				results.push_back(&s);
+	}
+	template<typename T>
+	fn filterByKind( CXCursorKind k, vector<T>& results) const->void {
+		for (auto& s:subNodes)
+			if (s.nodeKind==k)
+				results.push_back(&s);
+	}
+
 	fn filterByKindRec( CXCursorKind k, vector<CpAstNode>& results) const->void;
+	fn filterByKindMut( CXCursorKind k, vector<PAstNode>& results)->void;
 
 	template<typename F>
 	fn filterIndexed(const F& f, vector<const AstNode*>& results, vector<int32_t>& resultIndices) const->void {

@@ -6,11 +6,6 @@ fn AstNode::filterByKindRec( CXCursorKind k, vector<CpAstNode>& results) const->
 		s.filterByKindRec(k,results);
 }
 //grr. lost default args with header-generator.
-fn AstNode::filterByKind( CXCursorKind k, vector<CpAstNode>& results) const->void {
-	for (auto& s:subNodes)
-		if (s.nodeKind==k)
-			results.push_back(&s);
-}
 
 fn AstNode::count( CXCursorKind k) const->int{
 	int num=0;

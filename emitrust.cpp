@@ -1,6 +1,9 @@
 #include "emitrust.h"
+#include <algorithm>
 // temporary until we've perfected how const -> mut
 #define NO_MUTABLE
+
+#define ER_TRACE(X)
 
 #define EMIT(...) fprintf(gOut, __VA_ARGS__)
 #define EMIT_INDENT(D,...) {indent(D);fprintf(gOut,__VA_ARGS__);}
@@ -334,7 +337,7 @@ fn emitCpp2CShim_GlobalFunctionDecl(EmitCtx& ec, const AstNode&n, EmitContext de
 	EMIT("{");
 	EMIT("return %s(",n.cname());
 	apply_separated(args,
-		[](CpAstNode n) { EMIT(n->cname());},
+		[](CpAstNode n) { EMIT("%s",n->cname());},
 		[](CpAstNode n) { EMIT(",");}
 	);
 	EMIT(");");
@@ -348,10 +351,10 @@ fn emitRust_Constructor(EmitCtx& ec, const AstNode& n, EmitContext depth, const 
 	/*
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
-	EMIT_INDENT(depth,"pub fn new",n.cname());
+	EMIT_INDENT(depth,"pub fn new_%s",n.cname());
     emitRust_FunctionArguments(ec,n, depth, true, nullptr,false);
 	EMIT("->");
-	EMIT(selfType);
+	EMIT("%s",selfType);
 
 	if (selfType && emitCShim) {
 		EMIT("{\n");
@@ -377,7 +380,7 @@ fn emitRust_Destructor(EmitCtx& ec, const AstNode& n, EmitContext depth, const c
 	/*
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
-	EMIT_INDENT(depth," fn drop(&mut self)",n.cname());
+	EMIT_INDENT(depth," fn drop(&mut self)");
 	if (emitCShim && selfType) {
 		EMIT("{ unsafe { delete_%s(self)} }", selfType);
 	}
@@ -394,10 +397,18 @@ fn emitRust_InnerDecls(EmitCtx& ec, const AstNode& n, const vector<CpAstNode>& d
 	EMIT_INDENT(depth,"} //mod %s\n",n.cname());
 }
 
+// a mod is handled the same as a namespace.
+// inner decls can come from a namespace, or a class/struct/..
+
+fn emitRust_Mod(EmitCtx& ec, const AstNode& n, int depth)->void {
+	vector<CpAstNode> subNodes;
+	for (auto& x: n.subNodes) subNodes.push_back(&x);
+	emitRust_InnerDecls(ec, n, subNodes, depth);
+}
 
 fn emitRust_Enum(EmitCtx& ec, const AstNode& n, EmitContext depth)->void {
 	if (!strlen(n.cname())) { printf("error trying to emit anon enum?!\n"); return; }
-	ASSERT(n.name()!="vector");
+	ASSERT(n.name!="vector");
 	ec.define(n.name);//.insert(n.name);
 
 	vector<CpAstNode>	decls;
@@ -430,7 +441,7 @@ fn emitCpp2CShim_ClassTemplate(EmitCtx& ec, const AstNode& n, EmitContext depth)
 	vector<CpAstNode> methods;
 	n.filterByKind(CXCursor_CXXMethod,methods);
 	const char* selfType = n.name.c_str();
-	EMIT("//struct %s numMethods=%d\n",n.name.c_str(),methods.size());
+	EMIT("//struct %s numMethods=%z\n",n.name.c_str(),methods.size());
 	
 	for (auto &m:methods) {
 		if (!shouldEmitFunction(ec,m)) continue;
@@ -457,30 +468,79 @@ fn emitCpp2CShim_ClassTemplate(EmitCtx& ec, const AstNode& n, EmitContext depth)
 		EMIT_INDENT(depth,"};\n");
 	}
 }
+
+// contents of an ast node, but filtered into specific types instead of in declaratin order.
+template<typename T,typename NODE>
+struct FilteredNodeContents {
+	vector<T> typeParams;
+	vector<T> fields;
+	vector<T> methods;
+	vector<T> innerDecls;
+
+	FilteredNodeContents(NODE& n){
+		n.filterByKind(CXCursor_TemplateTypeParameter, typeParams);
+		n.filterByKind(CXCursor_FieldDecl, fields);
+		n.filterByKind(CXCursor_CXXMethod, methods);
+
+		n.filterByKind(CXCursor_StructDecl, innerDecls);
+		n.filterByKind(CXCursor_ClassDecl, innerDecls);
+		n.filterByKind(CXCursor_ClassTemplate, innerDecls);
+		n.filterByKind(CXCursor_EnumDecl, innerDecls);
+		n.filterByKind(CXCursor_TypedefDecl, innerDecls);
+	}
+};
+
+fn emitRust_transformNestedClassesToMods(AstNode& n)->void {
+	auto nk=n.nodeKind;
+	if (	(n.count(CXCursor_StructDecl)+	n.count(CXCursor_ClassDecl)+n.count(CXCursor_ClassTemplate)+n.count(CXCursor_EnumDecl)+n.count(CXCursor_TypedefDecl))>0 &&
+			(nk==CXCursor_StructDecl || nk==CXCursor_ClassDecl || nk==CXCursor_ClassTemplate)
+		)
+	{
+		printf("Creating module to hold subnodes %s\n",n.name.c_str());
+		FilteredNodeContents<AstNode*,AstNode&> fnc(n);
+		AstNode new_this;
+		AstNode new_mod;
+		new_mod.nodeKind=CXCursor_Namespace; // closest approx to a rust mod is a sepples namespace
+		new_mod.parent=&n;
+		new_mod.name=n.name; 
+		std::transform(new_mod.name.begin(), new_mod.name.begin(), new_mod.name.end(), ::tolower);// life without lambdas, hell.
+		new_mod.typeName="";
+		for (int i=0; i<fnc.innerDecls.size(); i++) {
+			new_mod.subNodes.push_back(*fnc.innerDecls[i]);
+		}
+		// we hope this is all move semantics, not deepcopy.
+		new_this.nodeKind=n.nodeKind;
+		new_this.name=n.name;
+		new_this.typeName=n.typeName;
+		new_this.cxType=n.cxType;
+		new_this.resultType=n.resultType;
+
+		for (auto&x : fnc.typeParams) {new_this.subNodes.push_back(*x);}
+		for (auto&x : fnc.fields) {new_this.subNodes.push_back(*x);}
+		for (auto&x : fnc.methods) {new_this.subNodes.push_back(*x);}
+
+		// 'n' becomes a module we just described, containing a struct that was this
+		n=new_mod;
+		n.subNodes.push_back(new_this);
+		for (int i=0; i<n.subNodes.size();i++) { n.subNodes[i].parent=&n;}		
+	}
+	// continue scanning..
+	for (auto &subnode :n.subNodes) { emitRust_transformNestedClassesToMods(subnode);}
+}
+
 fn emitRust_ClassTemplate(EmitCtx& ec,const AstNode& n, EmitContext depth)->void {
 	auto cn=n.cname(); if (!strlen(cn)) {printf("error trying to emit nameless structure\n"); return; }
 
 	// filter template params...
 //	n.filter([](AstNode& n){ if (n==XCursor_TemplateT)}
-	vector<CpAstNode> typeParams;
-	n.filterByKind(CXCursor_TemplateTypeParameter, typeParams);
-	vector<CpAstNode> fields;
-	n.filterByKind(CXCursor_FieldDecl, fields);
-	vector<CpAstNode> methods;
-	n.filterByKind(CXCursor_CXXMethod, methods);
-	vector<CpAstNode> innerDecls;
+	FilteredNodeContents<CpAstNode,const AstNode&>  fnc(n);
 
-	n.filterByKind(CXCursor_StructDecl, innerDecls);
-	n.filterByKind(CXCursor_ClassDecl, innerDecls);
-	n.filterByKind(CXCursor_ClassTemplate, innerDecls);
-	n.filterByKind(CXCursor_EnumDecl, innerDecls);
-	n.filterByKind(CXCursor_TypedefDecl, innerDecls);
 /*	if (!(fields.size() || methods.size() || innerDecls.size())) {
 		printf("anon struct, r.e. unhandled duplicate/forward decl??");
 		return;
 	}
 */
-	ASSERT(n.name()!="vector");
+
 	ec.define(n.name);
 	auto base = n.findFirst(CXCursor_CXXBaseSpecifier);
 #ifdef EMIT_DESTRUCTORS
@@ -497,15 +557,15 @@ fn emitRust_ClassTemplate(EmitCtx& ec,const AstNode& n, EmitContext depth)->void
 
 	// other metadata for binding ?
 	EMIT_INDENT(depth,"pub struct\t%s", n.cname());
-	emitRust_GenericTypeParams(ec,typeParams);
+	emitRust_GenericTypeParams(ec,fnc.typeParams);
 
-	if (!fields.size()) { EMIT(";\n");}
+	if (!fnc.fields.size()) { EMIT(";\n");}
 	else {
-		EMIT("\t{\n",n.cname());
+		EMIT("\t{\n");
 		if (base) {
 			EMIT_INDENT(depth+1,"tbase:%s,\n",base->cname()+strlen("struct"));
 		}
-		apply_separated(fields,
+		apply_separated(fnc.fields,
 			[&](CpAstNode& s) {
 				EMIT_INDENT(depth+1,"%s:", s->cname());
                 EMIT("%s",emit_CXTypeRec(ec,EL_RUST, s->cxType,IM_DontCare).c_str());
@@ -517,21 +577,21 @@ fn emitRust_ClassTemplate(EmitCtx& ec,const AstNode& n, EmitContext depth)->void
 		EMIT("\n");
 		EMIT_INDENT(depth,"}\n");
 	}
-	if  (methods.size()) {
+	if  (fnc.methods.size()) {
         // todo: gather overloaded methods
 		// and emit postfixed types
 		EMIT_INDENT(depth,"impl ");
-		emitRust_GenericTypeParams(ec,typeParams);
+		emitRust_GenericTypeParams(ec,fnc.typeParams);
 
 		EMIT("%s",n.cname());
-		emitRust_GenericTypeParams(ec,typeParams);
+		emitRust_GenericTypeParams(ec,fnc.typeParams);
 
 		EMIT(" {\n" );
 //		auto f=n.findFirst(CXCursor_Constructor);
 		auto ctr=emitRust_FindDefaultConstructor(ec,n);
 		if (ctr) 
 			emitRust_Constructor(ec,*ctr,depth+1, n.cname(),true);
-		for (auto &m:methods) {
+		for (auto &m:fnc.methods) {
             bool isSelfMutable= false;//clang_isConstQualifiedType(m->cxType);
             emitRust_FunctionDecl(ec,*m,depth+1, true, n.cname(),isSelfMutable,  true);
 		}
@@ -543,7 +603,7 @@ fn emitRust_ClassTemplate(EmitCtx& ec,const AstNode& n, EmitContext depth)->void
 			EMIT("->*%s;}\n",n.cname(),n.cname(),n.cname());
 		}
 		// emit C shim prototypes..
-		for (auto &m:methods) {	
+		for (auto &m:fnc.methods) {	
 			EMIT_INDENT(depth,"extern{ pub fn %s_%s",n.cname(),m->cname());
             emitRust_FunctionArguments(ec,*m,depth,false, n.cname(),false);
 			EMIT("->%s;",emitRust_FunctionReturnType_asStr(ec,*m,0,0).c_str());
@@ -556,11 +616,9 @@ fn emitRust_ClassTemplate(EmitCtx& ec,const AstNode& n, EmitContext depth)->void
 	}
 #endif
 
-	
-
-
-	if (innerDecls.size()>0)
-		emitRust_InnerDecls(ec,n,innerDecls,depth);
+	// if our transformation worked.. this doesn't happen
+	if (fnc.innerDecls.size()>0)
+		emitRust_InnerDecls(ec,n,fnc.innerDecls,depth);
 }
 
 using namespace std;
@@ -668,6 +726,9 @@ fn emitRustItem(EmitCtx& ec, EmitRustMode m,CpAstNode n,int depth)->bool
 //		ASSERT(n->name()!="vector");
 //		ec.defined_symbols.insert(n->name);
 		switch (n->nodeKind) {
+			case CXCursor_Namespace:
+				emitRust_Mod(ec,*n,depth);
+				return true;
 			case CXCursor_TypedefDecl:  {
 				if (n->subNodes.size()>0) {
 					printf("TYPEDEF %s %s{%s}\n", n->name.c_str(), 
@@ -734,6 +795,7 @@ fn emitRustRecursive(EmitCtx& ec, EmitRustMode m,const AstNode& n,EmitContext de
 }
 fn emitRustModPrefix(EmitCtx& ec, const AstNode& n,EmitContext depth)->void {
 	// todo, indent ..
+	EMIT("use super::*;");// todo - submodules need to be more intelligent, we need nested scopes (EmitCtx)
 	EMIT("use std::libc::{c_void, c_char,c_uchar, c_short,c_ushort,c_long,c_ulong,c_int,c_uint, c_float,c_double,c_longlong,c_ulonglong };\n");
 //	EMIT("use super::*;\n");
 // everything we didn't find, we assume is passed in to us..
@@ -781,6 +843,7 @@ fn emitRustPrefix(EmitCtx& ec, const AstNode& n,EmitContext depth)->void {
 fn emitRust(EmitRustMode mode, const AstNode& root)->void {
 	EmitCtx ec;
 	// prot pass..
+
 
 	if (mode==EmitRustMode_Rust) {
 	// prototype pass, find everything.

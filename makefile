@@ -2,20 +2,21 @@ LIBS=-L$(LLVM)/Release/lib
 INC=-I$(LLVM)/tools/clang/include -I$(LLVM)/include
 CC=clang  $(LIBS) $(INC)  
 
-CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC)
+CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC) -DDEBUG
 
 
 # grep  "fn\s*\w*::\w\(.*\).*{" ast.cpp |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > ast_methods.h && more ast_methods.h
 
 TEST_CMD=./main -w testoutput -dcr $(TEST_OPTS)
 
+test: testoutput
+	rustc test.rs -L. -C link-args="-ltestinput -lstdc++"
+	./test
 
 testoutput: test_testoutput.cpp demo libtestinput.a
 	echo "compiliong CPP shim (wraps methods as externC)"
 	$(CPP) $< emitrust.cpp main.cpp clanghelpers.cpp ast.cpp testinput.cpp -lclang -o ./trash -Wno-return-type
 	echo "compiliong rust test that includes generated mod 'testoutput.rs"
-	rustc test.rs -L. -C link-args="-ltestinput -lstdc++"
-	./test
 
 demo: main
 	echo  $(LLVM)
@@ -52,8 +53,8 @@ libtestinput.a:testinput.o testoutput.o
 #ClassName.hxx = member function prototypes for 'classname'
 #todo-figure out script/regex to gather ClassName.hxx from *.cpp
 
-GENERATE_METHOD_PROTOTYPES=	grep  "fn\s*\w*::\w\(.*\).*{" $< |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > $@
-GENERATE_FUNCTION_PROTOTYPES=	grep  "fn\s*\w\([^:]*\){" $< |sed 's/fn\s*\(\w*.*\){/\tfn \1;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > $@
+GENERATE_METHOD_PROTOTYPES=	grep  "fn\s\s*\w*::\w\(.*\).*{" $< |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > $@
+GENERATE_FUNCTION_PROTOTYPES=	grep  "fn\s\s*\w\([^:]*\){" $< |sed 's/fn\s*\(\w*.*\){/\tfn \1;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > $@
 
 AstNode.hxx: ast.cpp
 	$(GENERATE_METHOD_PROTOTYPES)

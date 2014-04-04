@@ -18,8 +18,15 @@ pub type FILE = *c_void;
 pub struct set<T,cmp,A=allocator<T> >;
 pub type EmitContext=int;
 pub type CpAstNode=*AstNode;
+pub type size_t = uint;
+pub type int64_t=i64;
+pub type unt64_t=u64;
 pub type int32_t=i32;
-pub type uint32_t=u32;
+pub type unt32_t=u32;
+pub type int16_t=i16;
+pub type unt16_t=u16;
+pub type int8_t=i8;
+pub type unt8_t=u8;
 pub struct time_t;
 pub struct CrCXType;
 pub struct IndexerCallbacks;
@@ -67,7 +74,7 @@ pub struct CXToken;
 pub struct CXTranslationUnit;
 pub struct CXType;
 pub struct CXVirtualFileOverlay;
-pub type size_t = uint;
+
 pub struct AstNode;
 
 // do something using the created binding...

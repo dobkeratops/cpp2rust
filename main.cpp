@@ -179,16 +179,17 @@ fn main(int argc, const char** argv)->int
 	if (gOptions.dumpAst) {
 		dump(root,0);
 	}
-	if (gOptions.emitRust) {
-		auto fname=gOutputFilename+std::string(".rs");
-		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
-		emitRust(EmitRustMode_Rust, root);
-		if (fp) {fclose(fp);gOut=stdout;}
-	}
 	if (gOptions.emitCpp) {
 		auto fname=gOutputFilename+std::string(".cpp");
 		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
 		emitRust(EmitRustMode_CppShim, root);
+		if (fp) {fclose(fp);gOut=stdout;}
+	}
+	if (gOptions.emitRust) {
+		auto fname=gOutputFilename+std::string(".rs");
+		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
+		emitRust_transformNestedClassesToMods(root);	// TODO: we might yet have to do this transform internally,dynamic.
+		emitRust(EmitRustMode_Rust, root);
 		if (fp) {fclose(fp);gOut=stdout;}
 	}
 	// no options given , write files..

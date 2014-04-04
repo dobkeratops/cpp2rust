@@ -23,16 +23,21 @@ struct Emitter{
 	int depth;
 };
 typedef int EmitContext;
+
 struct EmitCtx {
+	EmitCtx* parent;
 	set<string>	defined_symbols;
 	set<string>	referenced_symbols;	
 	set<string>	emit_this_pass;
+	map<string,EmitCtx>	sub_scopes;
 	void define(const string& s) {
 		this->defined_symbols.insert(s);
 		this->emit_this_pass.insert(s);
 	}
+	EmitCtx() { parent=0;}
 };
 
+void emitRust_transformNestedClassesToMods(AstNode& root);
 
 
 
