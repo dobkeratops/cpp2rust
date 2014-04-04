@@ -23,6 +23,15 @@ struct Emitter{
 	int depth;
 };
 typedef int EmitContext;
+struct EmitCtx {
+	set<string>	defined_symbols;
+	set<string>	referenced_symbols;	
+	set<string>	emit_this_pass;
+	void define(const string& s) {
+		this->defined_symbols.insert(s);
+		this->emit_this_pass.insert(s);
+	}
+};
 
 
 pconstchar_t FOOBARFUNCTION1(int32_t ,pair<int32_t,string>& FOOBARFUNCTION_ARG);

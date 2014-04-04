@@ -182,14 +182,13 @@ fn main(int argc, const char** argv)->int
 	if (gOptions.emitRust) {
 		auto fname=gOutputFilename+std::string(".rs");
 		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
-		emitRustPrefix(root,0);
-		emitRustRecursive(EmitRustMode_Rust, root,0);
+		emitRust(EmitRustMode_Rust, root);
 		if (fp) {fclose(fp);gOut=stdout;}
 	}
 	if (gOptions.emitCpp) {
 		auto fname=gOutputFilename+std::string(".cpp");
 		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
-		emitRustRecursive(EmitRustMode_CppShim, root,0);
+		emitRust(EmitRustMode_CppShim, root);
 		if (fp) {fclose(fp);gOut=stdout;}
 	}
 	// no options given , write files..
