@@ -1,6 +1,12 @@
 #include "emitrust.h"
 #include <algorithm>
 // temporary until we've perfected how const -> mut
+
+// KNOWN BUGS: Nested Class with Type Parameters:
+// it doesn't propogate the type-params to interior nodes that need them.
+// it doesn't know how to re-word/store interior nodes' type-params.
+// Better to spit out an error message about it.
+
 #define NO_MUTABLE
 
 #define ER_TRACE(X)
@@ -288,14 +294,18 @@ fn emitRust_CShimArgs(EmitCtx& ec, const AstNode& n, EmitContext depth, const ch
     emit_CShimArgs(ec,EL_RUST,n,depth,selfType,isSelfMutable);
 }
 
+fn emitRust_TypeParamsOfNode(EmitCtx& ec, const AstNode& n)->void {
+	vector<CpAstNode> typeParams; n.filterByKind(CXCursor_TemplateTypeParameter, typeParams);
+	emitRust_GenericTypeParams(ec,typeParams);
+}
+
 fn emitRust_FunctionDecl(EmitCtx& ec, const AstNode&n, EmitContext depth,bool asMethod, const char* selfType,bool isSelfMutable, bool emitRustToCShimCall)->void 	{
 	if (!shouldEmitFunction(ec,&n)) return; 
 	EMIT_INDENT(depth,"pub fn %s",n.cname());
     //isSelfMutable = ??? perhaps the 'this pointer' is actually one down?
     // perhaps its a modifier of the method node.. one we missed in building our ast copy.
-	vector<CpAstNode> typeParams; n.filterByKind(CXCursor_TemplateTypeParameter, typeParams);
 	vector<CpAstNode> args; n.filterByKind(CXCursor_ParmDecl, args);
-	emitRust_GenericTypeParams(ec,typeParams);
+	emitRust_TypeParamsOfNode(ec,n);
     emitRust_FunctionArguments(ec,n,depth,asMethod, selfType,isSelfMutable);
 	EMIT("->%s",emitRust_FunctionReturnType_asStr(ec,n,0,0).c_str());
 
@@ -489,6 +499,22 @@ struct FilteredNodeContents {
 		n.filterByKind(CXCursor_TypedefDecl, innerDecls);
 	}
 };
+void AstNode::findModClasses(vector<pair<CpAstNode,CpAstNode>>& results) const {
+	for (auto &sn : this->subNodes) {
+		if (sn.nodeKind != CXCursor_Namespace)
+			continue;
+		for (auto& ssn : sn.subNodes) {
+			if (sn.name!=ssn.name)
+				continue;
+			auto ssnk=ssn.nodeKind;
+			if (!(ssnk==CXCursor_StructDecl || ssnk==CXCursor_ClassDecl || ssnk==CXCursor_ClassTemplate))
+				continue;
+			// here we are.
+			results.push_back(make_pair(&sn,&ssn));
+		}
+	}
+}
+
 
 fn emitRust_transformNestedClassesToMods(AstNode& n)->void {
 	auto nk=n.nodeKind;
@@ -793,27 +819,47 @@ fn emitRustRecursive(EmitCtx& ec, EmitRustMode m,const AstNode& n,EmitContext de
 	}
 	emitRust_GatherFunctionsAsMethodsAndTraits(ec, n,depth);
 }
-fn emitRustModPrefix(EmitCtx& ec, const AstNode& n,EmitContext depth)->void {
-	// todo, indent ..
-	EMIT("use super::*;");// todo - submodules need to be more intelligent, we need nested scopes (EmitCtx)
-	EMIT("use std::libc::{c_void, c_char,c_uchar, c_short,c_ushort,c_long,c_ulong,c_int,c_uint, c_float,c_double,c_longlong,c_ulonglong };\n");
-//	EMIT("use super::*;\n");
-// everything we didn't find, we assume is passed in to us..
+void emitXRefs(EmitCtx& ec, const AstNode& n,int depth){
 	for (auto sym=ec.referenced_symbols.begin(); sym!=ec.referenced_symbols.end(); ++sym) {
 		if (ec.defined_symbols.count(*sym)==0) {
-			printf("XREFD: %s\n", (*sym).c_str());
-			EMIT("use %s;\n", (*sym).c_str());
+	//printf("XREFD: %s\n", (*sym).c_str());
+		EMIT_INDENT(depth,"use %s;\n", (*sym).c_str());
 		} else {
-			printf("DEFD: %s\n", (*sym).c_str());
+	//printf("DEFD: %s\n", (*sym).c_str());
 
 		}
 	}
 	for (auto sym=ec.defined_symbols.begin(); sym!=ec.defined_symbols.end(); ++sym) {
-		printf("DEFINED IN MODULE: %s\n", (*sym).c_str());
+	//printf("DEFINED IN MODULE: %s\n", (*sym).c_str());
 	}
-	printf("DEFINED %d REFERENCED: %d\n", ec.defined_symbols.size(), ec.referenced_symbols.size());
-	EMIT("pub type size_t=uint;\n");
-	EMIT("pub type c_bool=bool;\n");
+	//printf("DEFINED %d REFERENCED: %d\n", ec.defined_symbols.size(), ec.referenced_symbols.size());
+}
+
+
+fn emitRustModPrefix(EmitCtx& ec, const AstNode& n,EmitContext depth)->void {
+	// todo, indent ..
+	EMIT_INDENT(depth,"use super::*;\n");// todo - submodules need to be more intelligent, we need nested scopes (EmitCtx)
+	EMIT_INDENT(depth,"use std::libc::{c_void, c_char,c_uchar, c_short,c_ushort,c_long,c_ulong,c_int,c_uint, c_float,c_double,c_longlong,c_ulonglong };\n");
+	// find 'mod-classes' - C++ classes with inner-classes, 
+	// eg class X{ class Y class Z} => namespace X{class X,class Y class Z}=>mod X{struct X struct Y struct Z}
+
+	vector<pair<CpAstNode,CpAstNode>> modClasses; n.findModClasses(modClasses);
+	emitXRefs(ec,n,depth);
+//	for (auto &mc : modClasses) { EMIT("pub use testoutput::%s::%s;\n", mc.first->name.c_str(),mc.second->name.c_str());}
+
+	EMIT_INDENT(depth,"pub type size_t=uint;\n");
+	EMIT_INDENT(depth,"pub type c_bool=bool;\n");
+	// TODO: this is going to need template params.
+	for (auto &mc : modClasses) { 
+		EMIT_INDENT(depth,"pub type %s", mc.second->name.c_str());
+		emitRust_TypeParamsOfNode(ec,*mc.second);
+		EMIT(" =%s::%s",mc.first->name.c_str(), mc.second->name.c_str());
+		emitRust_TypeParamsOfNode(ec,*mc.second);
+		EMIT(";\n");
+	}
+		
+//=%s::%s;\n", mc.second->name.c_str(), mc.first->name.c_str(),mc.second->name.c_str());}
+//
 }
 
 fn emitRustPrefix(EmitCtx& ec, const AstNode& n,EmitContext depth)->void {

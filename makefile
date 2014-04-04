@@ -81,3 +81,6 @@ debug: main
 clean:
 	rm *.hxx
 	rm ./main
+	rm testoutput.rs
+	rm testoutput.cpp
+

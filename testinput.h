@@ -25,6 +25,8 @@ struct SomeBase {
     SomeBase Baz(const vector<Banana>& b) const;
 };
 struct Vec3 { float x; float y; float z;};
+
+
 struct Scene {
 	struct Triangle {
 		int32_t i0,i1,i2;

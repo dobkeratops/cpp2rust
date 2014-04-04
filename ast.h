@@ -112,6 +112,8 @@ struct AstNode {
 	fn findFirstRec(CXCursorKind k) const->CpAstNode;
 	fn count(CXCursorKind k) const->int32_t;
 
+	void findModClasses(vector<pair<CpAstNode,CpAstNode>>& results) const;
+
 //	#include "AstNode.hxx"
 };
 #include "ast_fn.hxx"
