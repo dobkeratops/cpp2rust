@@ -65,11 +65,36 @@ bool shouldEmitFunction(CpAstNode m) {
 	 // we just want to pass useable references across.
 	bool b= !(strcmp(m->cname(),"operator")>=8);
 	return b;
+/*	if (strlen(m->cname())<strlen("operator")) return false;
+	if (m->cname()[0]=='o' && m->cname()[1]=='p'
+		&& m->cname()[2]=='e'
+		&& m->cname()[3]=='r'
+		&& m->cname()[4]=='a'
+		&& m->cname()[5]=='t'
+		&& m->cname()[6]=='o'
+		&& m->cname()[7]=='r') {
+		printf("DONT EMIT %s\n", m->cname());
+		exit(0);
+		return	false;
+
+	}
+	printf("EMIT %s\n", m->cname());
+
+	return true;
+*/
 }
 
 string emit_CXTypeDecl(enum EmitLang lang, CXCursor c) {
 	CXString name=clang_getCursorSpelling(c);
 	string str(clang_getCString(name));
+	if (!str.size()) {
+		str="c_void /*error,was nameless*/"; printf("error got a nameless type, writing as c_void");
+	}
+//	if (strcmp(str.c_str(), "struct")>=strlen("struct")) {
+	if (str.length()>=strlen("struct") && str[0]=='s' && str[1]=='t' && str[2]=='r' && str[3]=='u' && str[4]=='c'  && str[5]=='t') {
+		printf("got struct in name, %s\n", str.c_str());
+		exit(0);
+	}
 	clang_disposeString(name);
 
 	return str;
@@ -113,7 +138,7 @@ auto emit_CXTypeRec(enum EmitLang lang, CXType cxType, MutabilityInfo mut_in)->s
         case CXType_Enum:
         case CXType_Record:
             //str.append("RECORD=");
-            str+=qualifier;
+            if (lang!=EL_RUST) str+=qualifier;
             str+=emit_CXTypeDecl(lang,c);//get from the node, but we dont understand why :(
             break;
         case CXType_Pointer:{
@@ -128,14 +153,14 @@ auto emit_CXTypeRec(enum EmitLang lang, CXType cxType, MutabilityInfo mut_in)->s
 
         case CXType_Typedef:
             //str.append("TYPDEF=");
-            str+=qualifier;
+            if (lang!=EL_RUST) str+=qualifier;
             str+=emit_CXTypeDecl(lang,c); // hmm, but we *can* have template params on typedefs :(
             //str.append(CXType_to_str(cxType,lang));//emit_CXTypeDecl(lang, c);
             return str; // no template params.
         break;
 
         default:
-            str+=qualifier;
+            if (lang!=EL_RUST) str+=qualifier;
             str.append(CXType_to_str(cxType,lang));//emit_CXTypeDecl(lang, c);
     }
 
@@ -153,8 +178,10 @@ auto emit_CXTypeRec(enum EmitLang lang, CXType cxType, MutabilityInfo mut_in)->s
     return str;
 }
 auto emit_CXType(enum EmitLang lang, CXType cxType)->string {
-    return emit_CXTypeRec(lang,cxType,(lang==EL_RUST)?IM_Immutable:IM_Mutable /* have we said its mutable yet */);
+    let ret=emit_CXTypeRec(lang,cxType,(lang==EL_RUST)?IM_Immutable:IM_Mutable /* have we said its mutable yet */);
+	return ret;
 }
+
 
 /*
 auto emit_Typename(EmitLang lang, const AstNode* n,bool retnType, const vector<AstNode>* parent, int thisIndex)->string {
@@ -182,27 +209,48 @@ fn emitRust_GenericTypeParams(vector<CpAstNode>& typeParams)->void {
 	}
 }
 
-fn emit_FunctionArguments(EmitLang lang,const AstNode&n, EmitContext depth,const char* selfType, bool isSelfMutable)->void
+fn emit_FunctionArguments(EmitLang lang,const AstNode&n, EmitContext depth,bool asMethod, const char* selfType, bool isSelfMutable)->void
 {
 	vector<CpAstNode> args; vector<int> arg_indices; 
 	n.filterIndexed([](CpAstNode p){return p->nodeKind==CXCursor_ParmDecl;}, args,arg_indices);
 	EMIT("(");
 	if (selfType) {
         // todo - mutability of self seems completely wrong:(
-		if (lang==EL_RUST) {
-            EMIT(isSelfMutable?"&mut self":"&self");
-        } else {
-            EMIT(isSelfMutable?"%s *self":"const %s *self",selfType);
-        }
+		if (asMethod) {
+			if (lang==EL_RUST) {
+				EMIT(isSelfMutable?"&mut self":"&self");
+		     } else {
+		         EMIT(isSelfMutable?"%s *self":"const %s *self",selfType);
+		     }
+		} else {
+			if (lang==EL_RUST) {
+				EMIT(isSelfMutable?"mut this:%s":"this:%s", selfType);
+		     } else {
+		         EMIT(isSelfMutable?"%s *self":"const %s *self",selfType);
+		     }
+		}
 		if (args.size()) EMIT(",");
 	}
 	apply_separated(args,
-		[&](CpAstNode& s) {
+					[&](CpAstNode& s) {
             auto tn=emit_CXType(lang, s->cxType);
+			auto argname=s->cname();
+			if (!strlen(argname)) {
+				argname="_";
+			}
+			if (!strcmp(argname,"fn")) argname="_fn"; // rust reserved words..
+			if (!strcmp(argname,"in")) argname="_in"; // rust reserved words..
+			if (!strcmp(argname,"of")) argname="_of";
+			if (!strcmp(argname,"Trait")) argname="_trait";
+			if (!strcmp(argname,"crate")) argname="_crate";
+			if (!strcmp(argname,"self")) argname="_self";
+			if (!strcmp(argname,"Self")) argname="_Self";
+			if (!strcmp(argname,"mut")) argname="_mut";
+			if (!strcmp(argname,"let")) argname="_let";
 			if (lang==EL_RUST) {
-				EMIT("%s:%s",s->cname(),tn.c_str());	
+				EMIT("%s:%s",argname,tn.c_str());
 			} else {
-				EMIT("%s %s",tn.c_str(), s->cname());
+				EMIT("%s %s",tn.c_str(), s->cname() );
 			}
 		},
 		[](CpAstNode& s){EMIT(",");}
@@ -210,8 +258,8 @@ fn emit_FunctionArguments(EmitLang lang,const AstNode&n, EmitContext depth,const
 	EMIT(")");
 }
 
-fn emitRust_FunctionArguments(const AstNode&n, EmitContext depth,const char* selfType, bool isSelfMutable)->void {
-    return emit_FunctionArguments(EL_RUST,n, depth,selfType,isSelfMutable);
+fn emitRust_FunctionArguments(const AstNode&n, EmitContext depth,bool asMethod, const char* selfType, bool isSelfMutable)->void {
+    return emit_FunctionArguments(EL_RUST,n, depth,asMethod, selfType,isSelfMutable);
 }
 
 fn emit_FunctionReturnType_asStr(EmitLang lang, const AstNode& n, vector<AstNode>* parent, int index)->string{
@@ -244,7 +292,7 @@ fn emitRust_CShimArgs(const AstNode& n, EmitContext depth, const char* selfType,
     emit_CShimArgs(EL_RUST,n,depth,selfType,isSelfMutable);
 }
 
-fn emitRust_FunctionDecl(const AstNode&n, EmitContext depth,const char* selfType,bool isSelfMutable, bool emitRustToCShimCall)->void 	{
+fn emitRust_FunctionDecl(const AstNode&n, EmitContext depth,bool asMethod, const char* selfType,bool isSelfMutable, bool emitRustToCShimCall)->void 	{
 	if (!shouldEmitFunction(&n)) return; 
 	EMIT_INDENT(depth,"pub fn %s",n.cname());
     //isSelfMutable = ??? perhaps the 'this pointer' is actually one down?
@@ -252,7 +300,7 @@ fn emitRust_FunctionDecl(const AstNode&n, EmitContext depth,const char* selfType
 	vector<CpAstNode> typeParams; n.filterByKind(CXCursor_TemplateTypeParameter, typeParams);
 	vector<CpAstNode> args; n.filterByKind(CXCursor_ParmDecl, args);
 	emitRust_GenericTypeParams(typeParams);
-    emitRust_FunctionArguments(n,depth,selfType,isSelfMutable);
+    emitRust_FunctionArguments(n,depth,asMethod, selfType,isSelfMutable);
 	EMIT("->%s",emitRust_FunctionReturnType_asStr(n,0,0).c_str());
 
 	if (emitRustToCShimCall && selfType) {
@@ -263,20 +311,20 @@ fn emitRust_FunctionDecl(const AstNode&n, EmitContext depth,const char* selfType
 		EMIT_INDENT(depth,"}");
 
 	}
-	EMIT(";\n");
+	EMIT("\n");
 }
 
 fn emitRust_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 	// TODO - filter and dont emit global functions that are already declared "extern "C"
-	EMIT_INDENT(depth,"extern { pub fn %s",n.cname());
 	if (!shouldEmitFunction(&n)) return;
+	EMIT_INDENT(depth,"extern { pub fn %s",n.cname());
 	// TODO - some instantiation of some requested types... 
 	// with a rule for emiting C shims with a naming scheme
 	//vector<CpAstNode> typeParams; n.filter(CXCursor_TemplateTypeParameter, typeParams);
 	vector<CpAstNode> args; n.filterByKind(CXCursor_ParmDecl, args);
 	//emitRust_GenericTypeParams(typeParams);
 
-    emitRust_FunctionArguments(n,depth,nullptr, false);
+    emitRust_FunctionArguments(n,depth,false, nullptr, false);
 	EMIT("->%s",emitRust_FunctionReturnType_asStr(n,0,0).c_str());
 
 
@@ -289,7 +337,7 @@ fn emitCpp2CShim_GlobalFunctionDecl(const AstNode&n, EmitContext depth)->void 	{
 	auto rtnType=emit_FunctionReturnType_asStr(EL_CPP,n,0,0);
 	EMIT_INDENT(depth,"extern \"C\" %s %s",rtnType.c_str(), n.cname());
 	vector<CpAstNode> args; n.filterByKind(CXCursor_ParmDecl, args);
-    emit_FunctionArguments(EL_CPP, n,depth,nullptr,is_self_mutable);
+    emit_FunctionArguments(EL_CPP, n,depth, false, nullptr,is_self_mutable);
 	EMIT("{");
 	EMIT("return %s(",n.cname());
 	apply_separated(args,
@@ -308,7 +356,7 @@ fn emitRust_Constructor(const AstNode& n, EmitContext depth, const char* selfTyp
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
 	EMIT_INDENT(depth,"pub fn new",n.cname());
-    emitRust_FunctionArguments(n, depth, nullptr,false);
+    emitRust_FunctionArguments(n, depth, true, nullptr,false);
 	EMIT("->");
 	EMIT(selfType);
 
@@ -320,7 +368,7 @@ fn emitRust_Constructor(const AstNode& n, EmitContext depth, const char* selfTyp
 		EMIT_INDENT(depth,"}");
 	}
 
-	EMIT(";\n");
+	EMIT("\n");
 }
 
 fn emitRust_FindDefaultConstructor(const AstNode& n)->CpAstNode {
@@ -340,7 +388,7 @@ fn emitRust_Destructor(const AstNode& n, EmitContext depth, const char* selfType
 	if (emitCShim && selfType) {
 		EMIT("{ unsafe { delete_%s(self)} }", selfType);
 	}
-	EMIT(";\n");
+	EMIT("\n");
 }
 
 
@@ -354,6 +402,7 @@ fn emitRust_InnerDecls(const AstNode& n, const vector<CpAstNode>& decls, EmitCon
 
 
 fn emitRust_Enum(const AstNode& n, EmitContext depth)->void {
+	if (!strlen(n.cname())) { printf("error trying to emit anon enum?!\n"); return; }
 	vector<CpAstNode>	decls;
 	n.filterByKind(CXCursor_EnumConstantDecl,decls);
 	EMIT_INDENT(depth,"enum %s {\n",n.cname());
@@ -397,7 +446,7 @@ fn emitCpp2CShim_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 		vector<CpAstNode> args; m->filterByKind(CXCursor_ParmDecl, args);
 //		emitRust_GenericTypeParams(typeParams);
 //.		emitRust_FunctionArguments(*m,depth,selfType);
-        emit_FunctionArguments(EL_CPP, *m,depth,selfType, is_self_mutable);
+        emit_FunctionArguments(EL_CPP, *m,depth,false, selfType, is_self_mutable);
 
 			
 
@@ -412,6 +461,7 @@ fn emitCpp2CShim_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 	}
 }
 fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
+	auto cn=n.cname(); if (!strlen(cn)) {printf("error trying to emit nameless structure\n"); return; }
 
 	// filter template params...
 //	n.filter([](AstNode& n){ if (n==XCursor_TemplateT)}
@@ -445,11 +495,11 @@ fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 	EMIT_INDENT(depth,"struct\t%s", n.cname());
 	emitRust_GenericTypeParams(typeParams);
 
-	if (!fields.size()) { EMIT("\t{}\n");}
+	if (!fields.size()) { EMIT(";\n");}
 	else {
 		EMIT("\t{\n",n.cname());
 		if (base) {
-			EMIT_INDENT(depth+1,"tbase:%s,\n",base->cname());
+			EMIT_INDENT(depth+1,"tbase:%s,\n",base->cname()+strlen("struct"));
 		}
 		apply_separated(fields,
 			[&](CpAstNode& s) {
@@ -479,19 +529,19 @@ fn emitRust_ClassTemplate(const AstNode& n, EmitContext depth)->void {
 			emitRust_Constructor(*ctr,depth+1, n.cname(),true);
 		for (auto &m:methods) {
             bool isSelfMutable= false;//clang_isConstQualifiedType(m->cxType);
-            emitRust_FunctionDecl(*m,depth+1, n.cname(),isSelfMutable,  true);
+            emitRust_FunctionDecl(*m,depth+1, true, n.cname(),isSelfMutable,  true);
 		}
 		EMIT_INDENT(depth,"}\n");
 		if (ctr) {
 			EMIT_INDENT(depth,"extern{ fn new_%s",n.cname());
             //auto selfCXType = m.cxType; // not sure, does this get our const qualifier?
-            emitRust_FunctionArguments(*ctr,depth,nullptr, false);
+            emitRust_FunctionArguments(*ctr,depth,true, nullptr, false);
 			EMIT("->*%s;}\n",n.cname(),n.cname(),n.cname());
 		}
 		// emit C shim prototypes..
 		for (auto &m:methods) {	
 			EMIT_INDENT(depth,"extern{ fn %s_%s",n.cname(),m->cname());
-            emitRust_FunctionArguments(*m,depth,n.cname(),false);
+            emitRust_FunctionArguments(*m,depth,false, n.cname(),false);
 			EMIT("->%s;",emitRust_FunctionReturnType_asStr(*m,0,0).c_str());
 			EMIT("}\n");
 		}
