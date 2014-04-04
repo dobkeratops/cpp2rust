@@ -170,7 +170,7 @@ fn parseArgs(int argc, const char** argv)->int
 		printf("options -d  dump ast\n");
 		printf("options -c  output c++ shim only\n");
 		printf("options -r  output rust binding only\n");
-
+		exit(0);
 	}
 	return myargs;
 }
