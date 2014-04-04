@@ -34,6 +34,10 @@ fn AstNode::findFirst(CXCursorKind k) const->CpAstNode {
 	return findFirstSub(k,false);
 }
 
+fn AstNode::numTemplateParams() const ->int32_t {
+	return this->count(CXCursor_TemplateTypeParameter)+this->count(CXCursor_TemplateTypeParameter);
+}
+
 fn dump( const AstNode& node,int depth)->void {
 	int	i;
 	auto indent=[](int d) {

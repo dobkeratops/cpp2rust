@@ -70,12 +70,25 @@ fn combineRefInTypename(EmitLang l, const string& qualifier, const string& types
     return combineSigilInTypename(l,qualifier,typestr,"&");
 }
 
+bool alphanumeric(const char c) {
+	return (c>='a' && c<='z') || (c>='A' && c<='Z') || c=='_' || (c>='0' && c<='9');
+}
+
 bool shouldEmitFunction(EmitCtx& ec, CpAstNode m) {
+	// todo: rename operators for binding
 	 // Dont do operators. new/delete. 
 	 // details of rust/c++ creating eachothers objects would be scary.
 	 // we just want to pass useable references across.
-	bool b= !(strcmp(m->cname(),"operator")>=8);
-	return b;
+	const char* s0=m->cname(), *s1="operator";
+	for (; *s0 && *s1; s0++,s1++) {
+		if (*s0!=*s1) return true;
+	}
+	char c1=*s1;
+	char c0=*s0;
+	if (!c1) { // all characters matched.. and we break a csymbol here -its an operator. return false;
+		if (!alphanumeric(c0)) return false;
+	}
+	return true;
 }
 
 string emit_CXTypeDecl(EmitCtx& ec, enum EmitLang lang, CXCursor c) {
@@ -451,7 +464,7 @@ fn emitCpp2CShim_ClassTemplate(EmitCtx& ec, const AstNode& n, EmitContext depth)
 	vector<CpAstNode> methods;
 	n.filterByKind(CXCursor_CXXMethod,methods);
 	const char* selfType = n.name.c_str();
-	EMIT("//struct %s numMethods=%z\n",n.name.c_str(),methods.size());
+	EMIT("//struct %s numMethods=%d\n",n.name.c_str(),(int) methods.size());
 	
 	for (auto &m:methods) {
 		if (!shouldEmitFunction(ec,m)) continue;
@@ -626,7 +639,7 @@ fn emitRust_ClassTemplate(EmitCtx& ec,const AstNode& n, EmitContext depth)->void
 			EMIT_INDENT(depth,"extern{ pub fn new_%s",n.cname());
             //auto selfCXType = m.cxType; // not sure, does this get our const qualifier?
             emitRust_FunctionArguments(ec,*ctr,depth,true, nullptr, false);
-			EMIT("->*%s;}\n",n.cname(),n.cname(),n.cname());
+			EMIT("->*%s;}\n",n.cname());
 		}
 		// emit C shim prototypes..
 		for (auto &m:fnc.methods) {	

@@ -21,9 +21,11 @@ typedef enum CXCursorKind CXCursorKind;
 struct AstNode;
 typedef const AstNode* CpAstNode;
 typedef AstNode* PAstNode;
+
+// AST Node the info extracted from a CXCursor - its a copy of a subset of the
+// ast organized for this task
 struct AstNode {
 	
-//	AstNodeId	nodeType;
 	AstNode*	parent;
 	CXCursorKind	nodeKind;
 	string name;
@@ -113,6 +115,7 @@ struct AstNode {
 	fn count(CXCursorKind k) const->int32_t;
 
 	void findModClasses(vector<pair<CpAstNode,CpAstNode>>& results) const;
+	fn numTemplateParams() const ->int32_t;
 
 //	#include "AstNode.hxx"
 };
