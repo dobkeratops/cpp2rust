@@ -36,8 +36,12 @@ all: main
 SRC=main.cpp clanghelpers.cpp ast.cpp emitrust.cpp 
 HDR=cpp2rustcommon.h clanghelpers.h ast.h emitrust.h
 
-cpp2rs: $(SRC)$(HDR) ast_fn.hxx emitrust_fn.hxx AstNode.hxx clanghelpers_fn.hxx 
+cpp2rs: $(SRC)$(HDR) ast_fn.hxx emitrust_fn.hxx AstNode.hxx clanghelpers_fn.hxx  TAGS
 	$(CPP) $(SRC) $(LIBS) -lclang -o $@
+
+TAGS: 
+	ctags -e -f $@ *.cpp *.h
+
 
 bindings.o: bindings.cpp test_testoutput.cpp
 	$(CPP) test_testoutput.cpp -o bindings.o -c

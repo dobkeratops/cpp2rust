@@ -361,7 +361,7 @@ fn emitRust_Constructor(EmitCtx& ec, const AstNode& n, EmitContext depth, const 
 	/*
 		// todo - wrappers for constructors with overload underscore qualifiers
 	*/
-	EMIT_INDENT(depth,"pub fn new_%s",n.cname());
+	EMIT_INDENT(depth,"pub fn new");
     emitRust_FunctionArguments(ec,n, depth, true, nullptr,false);
 	EMIT("->");
 	EMIT("%s",selfType);

@@ -133,6 +133,16 @@ fn testVisit(CXTranslationUnit tu)->void {
 }
 
 Options gOptions;
+FILE* assert_fopen(const char* filename, const char* mode) {
+	FILE* fp=fopen(filename,mode);
+	if (!fp){
+		printf("Could not open %s\n",filename);
+		exit(1);
+		return nullptr;
+	}
+	return fp;
+}
+
 
 string gOutputFilename("cpp2rust_output");
 fn parseArgs(int argc, const char** argv)->int 
@@ -140,6 +150,7 @@ fn parseArgs(int argc, const char** argv)->int
 	// TODO- Filter which namespaces to emit.
 	// dont emit std:: by default?
 	int	myargs=0;
+	
 	for (int i=0; i<argc; i++) {
 		// some hardcoded convinient default combinations, TODO handle properly.
 		if (!strcmp(argv[i],"-w")) {
@@ -160,12 +171,15 @@ fn parseArgs(int argc, const char** argv)->int
 		if (!strcmp(argv[i],"-dcr"))
 			{ gOptions.dumpAst=true;myargs=i;gOptions.emitCpp=true;gOptions.emitRust=true;}
 	}
-	if(!argc) {
+	if(argc<=1) {
 		printf("Cpp2Rust bindings generatoe\n");
 		printf("useage:\n");
 		printf("cpp2rs -w <outputname> [opts] <input cpp source> <compiler options>\n");
 		printf("eg options: default is to emit c++ shims & rust bindings as\n");
 		printf("'<outputname>.cpp' '<outputname>.rs'\n");
+		printf("\n");
+		printf("Example:\n");
+		printf("\tcpp2rs -w bindings mylibrary.h -std=c++11 -x c++\n");
 		printf("\n");
 		printf("options -d  dump ast\n");
 		printf("options -c  output c++ shim only\n");
@@ -194,14 +208,17 @@ fn main(int argc, const char** argv)->int
 	}
 	if (gOptions.emitCpp) {
 		auto fname=gOutputFilename+std::string(".cpp");
-		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
+		auto fp = assert_fopen(fname.c_str(),"wb"); 
+		gOut=fp;
 		emitRust(EmitRustMode_CppShim, root);
 		if (fp) {fclose(fp);gOut=stdout;}
 		printf("\nWrote %s C++ externC shims\n", gOutputFilename.c_str());
 	}
 	if (gOptions.emitRust) {
 		auto fname=gOutputFilename+std::string(".rs");
-		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
+		auto fp = assert_fopen(fname.c_str(),"wb");
+		gOut=fp;
+
 		emitRust_transformNestedClassesToMods(root);	// TODO: we might yet have to do this transform internally,dynamic.
 		emitRust(EmitRustMode_Rust, root);
 		if (fp) {fclose(fp);gOut=stdout;}
@@ -214,5 +231,4 @@ fn main(int argc, const char** argv)->int
 
 	return 0;
 }
-
 
