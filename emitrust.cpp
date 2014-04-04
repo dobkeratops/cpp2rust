@@ -206,13 +206,13 @@ fn emit_FunctionArguments(EmitCtx& ec, EmitLang lang,const AstNode&n, EmitContex
 			if (lang==EL_RUST) {
 				EMIT(isSelfMutable?"&mut self":"&self");
 		     } else {
-		         EMIT(isSelfMutable?"%s &self":"const %s &self",selfType);
+		         EMIT(isSelfMutable?"%s *self":"const %s *self",selfType);
 		     }
 		} else {
 			if (lang==EL_RUST) {
 				EMIT(isSelfMutable?"mut this:&%s":"this:&%s", selfType);
 		     } else {
-		         EMIT(isSelfMutable?"%s &self":"const %s &self",selfType);
+		         EMIT(isSelfMutable?"%s *self":"const %s *self",selfType);
 		     }
 		}
 		if (args.size()) EMIT(",");

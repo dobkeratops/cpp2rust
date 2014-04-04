@@ -30,7 +30,10 @@ main: $(SRC)$(HDR) ast_fn.hxx emitrust_fn.hxx AstNode.hxx clanghelpers_fn.hxx
 	$(CPP) $(SRC) $(LIBS) -lclang -o ./main 
 	
 testoutput: test_testoutput.cpp demo
-	$(CPP) $< -lclang -o ./trash -Wno-return-type
+	echo "compiliong CPP shim (wraps methods as externC)"
+	$(CPP) $< emitrust.cpp main.cpp clanghelpers.cpp ast.cpp testinput.cpp -lclang -o ./trash -Wno-return-type
+	echo "compiliong rust test that includes generated mod 'testoutput.rs"
+	rustc test.rs 
 
 # TODO- rule for every _methods.h from every .cpp
 #ClassName.hxx = member function prototypes for 'classname'

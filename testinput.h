@@ -1,5 +1,7 @@
 #ifndef TESTINPUT_H
 #define TESTINPUT_H
+#include <stdio.h>
+#include <vector>
 
 template<typename T>
 struct Vector {
@@ -15,7 +17,7 @@ struct SomeBase {
     void Foo(int x,float f);
     void Bar(const char* x);
     int Baz2(const SomeBase* a,const Banana& b) const;
-    SomeBase Baz(const vector<Banana>& b) const;
+    SomeBase Baz(const std::vector<Banana>& b) const;
 };
 
 struct Options : SomeBase{

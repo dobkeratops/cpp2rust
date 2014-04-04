@@ -34,10 +34,6 @@ struct EmitCtx {
 };
 
 
-pconstchar_t FOOBARFUNCTION1(int32_t ,pair<int32_t,string>& FOOBARFUNCTION_ARG);
-struct Foo {
-	void FOOBARFUNCTION2(vector<int32_t>& src);
-};
 
 
 #include "emitrust_fn.hxx"
