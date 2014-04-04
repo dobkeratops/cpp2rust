@@ -9,6 +9,14 @@ CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC)
 
 TEST_CMD=./main -w testoutput -dcr $(TEST_OPTS)
 
+
+testoutput: test_testoutput.cpp demo libtestinput.a
+	echo "compiliong CPP shim (wraps methods as externC)"
+	$(CPP) $< emitrust.cpp main.cpp clanghelpers.cpp ast.cpp testinput.cpp -lclang -o ./trash -Wno-return-type
+	echo "compiliong rust test that includes generated mod 'testoutput.rs"
+	rustc test.rs -L. -C link-args="-ltestinput -lstdc++"
+	./test
+
 demo: main
 	echo  $(LLVM)
 	$(TEST_CMD)
@@ -28,12 +36,17 @@ HDR=cpp2rustcommon.h clanghelpers.h ast.h emitrust.h
 
 main: $(SRC)$(HDR) ast_fn.hxx emitrust_fn.hxx AstNode.hxx clanghelpers_fn.hxx 
 	$(CPP) $(SRC) $(LIBS) -lclang -o ./main 
-	
-testoutput: test_testoutput.cpp demo
-	echo "compiliong CPP shim (wraps methods as externC)"
-	$(CPP) $< emitrust.cpp main.cpp clanghelpers.cpp ast.cpp testinput.cpp -lclang -o ./trash -Wno-return-type
-	echo "compiliong rust test that includes generated mod 'testoutput.rs"
-	rustc test.rs 
+
+testoutput.o: testoutput.cpp test_testoutput.cpp
+	$(CPP) test_testoutput.cpp -o testoutput.o -c
+
+testinput.o: testinput.cpp
+	$(CPP) $^ -o $@ -c
+
+libtestinput.a:testinput.o testoutput.o
+	ar rcs $@ $^
+#testinput.o testoutput.o
+
 
 # TODO- rule for every _methods.h from every .cpp
 #ClassName.hxx = member function prototypes for 'classname'
@@ -56,7 +69,7 @@ info:
 	@echo environment variables:-
 	@echo llvm = $(LLVM)
 
-TEST_OPTS= main.cpp -std=c++11 -x c++ -I/usr/include/x86_64-linux-gnu/c++/4.7/ -I/usr/include/clang/3.2/include
+TEST_OPTS= testinput.cpp -std=c++11 -x c++ -I/usr/include/x86_64-linux-gnu/c++/4.7/ -I/usr/include/clang/3.2/include
 run: main
 	./main -d $(TEST_OPTS)
 

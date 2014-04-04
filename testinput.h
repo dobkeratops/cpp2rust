@@ -2,6 +2,7 @@
 #define TESTINPUT_H
 #include <stdio.h>
 #include <vector>
+using namespace std;
 
 template<typename T>
 struct Vector {
@@ -11,13 +12,16 @@ struct Vector {
 struct Banana{
     int x,y,z;
 };
+struct Apple {
+	vector<int> mem;
+};
 
 struct SomeBase {
     int count;
     void Foo(int x,float f);
     void Bar(const char* x);
-    int Baz2(const SomeBase* a,const Banana& b) const;
-    SomeBase Baz(const std::vector<Banana>& b) const;
+    int Baz2(const Banana& b) const;
+    SomeBase Baz(const vector<Banana>& b) const;
 };
 
 struct Options : SomeBase{

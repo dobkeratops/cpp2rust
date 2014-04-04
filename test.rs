@@ -73,8 +73,12 @@ pub struct AstNode;
 // do something using the created binding...
 fn main() {
 
-	std::io::println("hello world");
+	std::io::println("rust hello world");
 	let opts=testoutput::Options::Option_s{x:1,y:2};
-	
+	let mut b=testoutput::Banana{x:1,y:2,z:3};
+	let mut x = testoutput::SomeBase{count:0};
+	unsafe { x.Foo(1,10.0);}
+	let baz_result=x.Baz2(&b);
+	println!("rust gets value from C++ {}",baz_result);
 }
 

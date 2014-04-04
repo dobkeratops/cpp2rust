@@ -1,4 +1,6 @@
 #include "emitrust.h"
+// temporary until we've perfected how const -> mut
+#define NO_MUTABLE
 
 #define EMIT(...) fprintf(gOut, __VA_ARGS__)
 #define EMIT_INDENT(D,...) {indent(D);fprintf(gOut,__VA_ARGS__);}
@@ -110,6 +112,11 @@ auto emit_CXTypeRec(EmitCtx& ec, enum EmitLang lang, CXType cxType, MutabilityIn
             qualifier+="const " ;
         }
     }
+#ifdef NO_MUTABLE
+	if (lang==EL_RUST) {
+		qualifier="";
+	}
+#endif
     // TODO: verify these basic cases work! where is the qualifier?
     //  const Foo& f    => f:&Foo
     //  Foo& f    => f:&mut Foo
@@ -476,13 +483,14 @@ fn emitRust_ClassTemplate(EmitCtx& ec,const AstNode& n, EmitContext depth)->void
 	ASSERT(n.name()!="vector");
 	ec.define(n.name);
 	auto base = n.findFirst(CXCursor_CXXBaseSpecifier);
-
+#ifdef EMIT_DESTRUCTORS
 	auto dtr=n.findFirst(CXCursor_Destructor);
 	if (dtr)  {
 		EMIT_INDENT(depth,"impl Drop for %s {\n", n.cname());
 		emitRust_Destructor(ec,*dtr,depth+1, n.cname(),true);
 		EMIT_INDENT(depth,"}\n");
 	}
+#endif
     // todo - filter what this is really.
 	// only make it a rust struct if it has data elements?
 	// ..otherwise if its a collection of functions/types it's really trait?
@@ -542,9 +550,11 @@ fn emitRust_ClassTemplate(EmitCtx& ec,const AstNode& n, EmitContext depth)->void
 			EMIT("}\n");
 		}
 	}
+#ifdef EMIT_DESTRUCTORS
 	if (dtr) {
 		EMIT_INDENT(depth,"extern{ fn delete_%s(self_ptr:*mut %s);}\n",n.cname(),n.cname())
 	}
+#endif
 
 	
 
