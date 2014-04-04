@@ -27,5 +27,13 @@ using namespace std;
 #define fn auto
 #define let auto
 
+struct Options {
+    bool dumpAst=false, emitRust=true,emitCpp=true;
+	bool defaults=true;
+};
+
 extern FILE* gOut; // TODO remove, pass context with depth/file
+extern Options gOptions;
+
+
 #endif /* CPP2RUSTCOMMON_H_ */

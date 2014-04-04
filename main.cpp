@@ -146,6 +146,7 @@ fn parseArgs(int argc, const char** argv)->int
 			gOutputFilename=string(argv[i+1]);
 			i+=2;
 		}
+		// todo parse properly. lazy here.
 		if (!strcmp(argv[i],"-d"))
 			{ gOptions.dumpAst=true;myargs=i;gOptions.emitRust=false;}
 		if (!strcmp(argv[i],"-dr"))
@@ -158,6 +159,18 @@ fn parseArgs(int argc, const char** argv)->int
 			{ gOptions.emitCpp=true;gOptions.emitRust=true; myargs=i;}
 		if (!strcmp(argv[i],"-dcr"))
 			{ gOptions.dumpAst=true;myargs=i;gOptions.emitCpp=true;gOptions.emitRust=true;}
+	}
+	if(!argc) {
+		printf("Cpp2Rust bindings generatoe\n");
+		printf("useage:\n");
+		printf("cpp2rs -w <outputname> [opts] <input cpp source> <compiler options>\n");
+		printf("eg options: default is to emit c++ shims & rust bindings as\n");
+		printf("'<outputname>.cpp' '<outputname>.rs'\n");
+		printf("\n");
+		printf("options -d  dump ast\n");
+		printf("options -c  output c++ shim only\n");
+		printf("options -r  output rust binding only\n");
+
 	}
 	return myargs;
 }
@@ -184,6 +197,7 @@ fn main(int argc, const char** argv)->int
 		auto fp = fopen(fname.c_str(),"wb"); if (fp) gOut=fp;
 		emitRust(EmitRustMode_CppShim, root);
 		if (fp) {fclose(fp);gOut=stdout;}
+		printf("\nWrote %s C++ externC shims\n", gOutputFilename.c_str());
 	}
 	if (gOptions.emitRust) {
 		auto fname=gOutputFilename+std::string(".rs");
@@ -191,6 +205,7 @@ fn main(int argc, const char** argv)->int
 		emitRust_transformNestedClassesToMods(root);	// TODO: we might yet have to do this transform internally,dynamic.
 		emitRust(EmitRustMode_Rust, root);
 		if (fp) {fclose(fp);gOut=stdout;}
+		printf("\nWrote %s rust bindings\n", gOutputFilename.c_str());
 	}
 	// no options given , write files..
 

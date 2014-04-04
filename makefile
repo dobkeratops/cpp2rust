@@ -7,26 +7,27 @@ CPP=clang++ -g -O0 -std=c++11 $(LIBS) $(INC) -DDEBUG
 
 # grep  "fn\s*\w*::\w\(.*\).*{" ast.cpp |sed 's/fn\s*\(\w*\)::\(\w*.*\){/\tfn \2;/' |sed 's/\(.*\)=.*\([,/)].*\)/\1\2/' > ast_methods.h && more ast_methods.h
 
-TEST_CMD=./main -w testoutput -dcr $(TEST_OPTS)
 
-test: testoutput
-	rustc test.rs -L. -C link-args="-ltestinput -lstdc++"
+TEST_OPTS= testinput.cpp -std=c++11 -x c++ -I/usr/include/x86_64-linux-gnu/c++/4.7/ -I/usr/include/clang/3.2/include
+
+test: bindings
+	rustc test.rs -L. -C link-args="-lbindings -lstdc++"
 	./test
 
-testoutput: test_testoutput.cpp demo libtestinput.a
+bindings: test_testoutput.cpp demo libbindings.a
 	echo "compiliong CPP shim (wraps methods as externC)"
 	$(CPP) $< emitrust.cpp main.cpp clanghelpers.cpp ast.cpp testinput.cpp -lclang -o ./trash -Wno-return-type
-	echo "compiliong rust test that includes generated mod 'testoutput.rs"
+	echo "compiliong rust test that includes generated mod 'bindings.rs"
 
-demo: main
+demo: cpp2rs
 	echo  $(LLVM)
-	$(TEST_CMD)
+	./cpp2rs -w bindings -dcr $(TEST_OPTS)
 	@echo output:-
-	cat testoutput.cpp
-	cat testoutput.rs
+	cat bindings.cpp
+	cat bindings.rs
 	@echo
 	@echo "generated testoutput.rs testoutput.cpp from invocation:"
-	@echo $(TEST_CMD)
+
 
 all: main
 
@@ -35,16 +36,16 @@ all: main
 SRC=main.cpp clanghelpers.cpp ast.cpp emitrust.cpp 
 HDR=cpp2rustcommon.h clanghelpers.h ast.h emitrust.h
 
-main: $(SRC)$(HDR) ast_fn.hxx emitrust_fn.hxx AstNode.hxx clanghelpers_fn.hxx 
-	$(CPP) $(SRC) $(LIBS) -lclang -o ./main 
+cpp2rs: $(SRC)$(HDR) ast_fn.hxx emitrust_fn.hxx AstNode.hxx clanghelpers_fn.hxx 
+	$(CPP) $(SRC) $(LIBS) -lclang -o $@
 
-testoutput.o: testoutput.cpp test_testoutput.cpp
-	$(CPP) test_testoutput.cpp -o testoutput.o -c
+bindings.o: bindings.cpp test_testoutput.cpp
+	$(CPP) test_testoutput.cpp -o bindings.o -c
 
 testinput.o: testinput.cpp
 	$(CPP) $^ -o $@ -c
 
-libtestinput.a:testinput.o testoutput.o
+libbindings.a:testinput.o bindings.o
 	ar rcs $@ $^
 #testinput.o testoutput.o
 
@@ -70,7 +71,6 @@ info:
 	@echo environment variables:-
 	@echo llvm = $(LLVM)
 
-TEST_OPTS= testinput.cpp -std=c++11 -x c++ -I/usr/include/x86_64-linux-gnu/c++/4.7/ -I/usr/include/clang/3.2/include
 run: main
 	./main -d $(TEST_OPTS)
 
@@ -80,7 +80,6 @@ debug: main
 
 clean:
 	rm *.hxx
-	rm ./main
-	rm testoutput.rs
-	rm testoutput.cpp
+	rm ./cpp2rs
+	rm bindings.*
 

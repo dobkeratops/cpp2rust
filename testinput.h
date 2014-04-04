@@ -43,7 +43,7 @@ struct Scene {
 	vector<Instance>	instances;
 };
 
-struct Options : SomeBase{
+struct Stuff : SomeBase{
     struct Option_s {
         int x,y;
     };
@@ -52,12 +52,10 @@ struct Options : SomeBase{
         OPT_BAR,
         OPT_BAZ
     };
-    bool dumpAst=false, emitRust=false,emitCpp=false;
-    Options() {};
-    ~Options() {};
+    Stuff() {};
+    ~Stuff() {};
 };
 
-extern Options gOptions;
 
 
 #endif // TESTINPUT_H

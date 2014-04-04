@@ -81,7 +81,7 @@ pub struct AstNode;
 fn main() {
 
 	std::io::println("rust hello world");
-	let opts=testoutput::Options::Option_s{x:1,y:2};
+	let opts=testoutput::Stuff::Option_s{x:1,y:2};
 	let mut b=testoutput::Banana{x:1,y:2,z:3};
 	let mut x = testoutput::SomeBase{count:0};
 	unsafe { x.Foo(1,10.0);}
